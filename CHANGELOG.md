@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Add a no-Git release-archive installer with overwrite protection and optional Pi registration.
+- Document curl installation, archive updates and migration; add offline installer checks to CI.
+- Resolve test dependencies through Pi's package resolver to support hoisted installations.
+
 ## 0.2.0
 
 - Add an interactive Ask box with context, choices, and an Other typed answer through `ask_user`.

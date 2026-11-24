@@ -11,11 +11,11 @@ const require = createRequire(root + '/package.json');
 const { createJiti } = require('jiti');
 const jiti = createJiti(import.meta.url, { alias: {
   '@earendil-works/pi-coding-agent': root + '/dist/index.js',
-  '@earendil-works/pi-tui': root + '/node_modules/@earendil-works/pi-tui/dist/index.js',
+  '@earendil-works/pi-tui': require.resolve('@earendil-works/pi-tui'),
   'typebox': require.resolve('typebox'),
 } });
 const { default: extension, frame, validPlan, gutterLine, footerStats, toolTitle, preview } = await jiti.import('./index.ts');
-const { visibleWidth, Text } = await import(root + '/node_modules/@earendil-works/pi-tui/dist/index.js');
+const { visibleWidth, Text } = await import(require.resolve('@earendil-works/pi-tui'));
 const events = {}, commands = {}, entries = [], tools = [], notifications = [];
 let resolver, widget, footerFactory, editorFactory;
 const pi = {

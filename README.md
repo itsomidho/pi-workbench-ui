@@ -25,6 +25,16 @@ Extensions execute with your user permissions. Review code before installation.
 
 ## Install
 
+### Without Git (recommended for a standalone installation)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
+```
+
+This downloads the tagged **v0.3.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. It never replaces an existing directory or symlink. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+
+Alternatively, let Pi manage a Git package:
+
 ```sh
 pi install git:github.com/itsomidho/pi-workbench-ui
 ```
@@ -43,7 +53,9 @@ If the directory already exists, inspect it before cloning or replacing it. When
 
 ### Update
 
-For the dedicated checkout, inspect local changes, then fast-forward only:
+For an **archive installation**, do not use `git pull`; back up the existing directory and reinstall as described in [Installation and updates](docs/installation.md).
+
+For a **Git checkout**, inspect local changes, then fast-forward only:
 
 ```sh
 git -C ~/.pi-workbench-ui status --short
@@ -105,6 +117,7 @@ npm test
 npm run check
 npm run test:integration
 npm run test:terminal
+npm run test:installer
 ```
 
 A globally installed Pi is discovered automatically; `PI_INSTALL_ROOT` can point at another installation. See [Development and testing](docs/development.md) and the [manual QA checklist](QA.md).

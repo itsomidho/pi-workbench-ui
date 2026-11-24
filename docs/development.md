@@ -12,6 +12,10 @@ cd pi-workbench-ui
 
 Runtime imports are supplied by Pi. No production dependencies are bundled. Test tooling discovers a local or global Pi installation; override its package directory with `PI_INSTALL_ROOT`.
 
+## Installer development
+
+`install.sh` installs a tagged GitHub archive without Git. Run `npm run test:installer` for Bash syntax and offline tests using mocked downloads and Pi registration, with real tar/Node/file moves. Tests cover fresh/default/custom installs, spaces in paths, existing directories/symlinks, bad options, failed downloads, corrupt archives, wrong package metadata and registration failure. They do not modify the real installation.
+
 ## Checks
 
 - `npm test`: state/renderer/settings regressions and synthetic performance checks.

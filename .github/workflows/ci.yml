@@ -18,6 +18,7 @@ jobs:
           python-version: '3.x'
       - name: Install tested Pi runtime
         run: npm install --global @earendil-works/pi-coding-agent@1.6.0
+      - run: npm run test:installer
       - run: npm run check
       - run: npm test
       - run: npm run test:integration
