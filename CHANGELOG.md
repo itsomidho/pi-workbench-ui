@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Let the same curl installer update older archive installs with a backup, rollback on failed replacement where possible, and no Pi re-registration.
+
 ## 0.4.0
 
 - Add configurable muted-cyan submitted-prompt borders, preserving native backgrounds, Markdown and terminal zones, with compact vertical spacing and aligned sides.

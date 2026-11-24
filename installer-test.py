@@ -1,5 +1,5 @@
 """Offline installer tests: fake only download and Pi registration, use real tar/Node/mv."""
-import io, json, os, pathlib, subprocess, tarfile, tempfile, unittest
+import io, json, os, pathlib, shutil, subprocess, tarfile, tempfile, unittest
 
 SCRIPT = pathlib.Path(__file__).with_name('install.sh').resolve()
 
@@ -30,7 +30,7 @@ exit "${FAIL_PI:-0}"
         path = self.bin / name
         path.write_text(content)
         path.chmod(0o755)
-    def make_archive(self, name='pi-workbench-ui', version='0.4.0', missing_prompt=False):
+    def make_archive(self, name='pi-workbench-ui', version='0.4.1', missing_prompt=False):
         files = {'package.json': json.dumps({'name': name, 'version': version, 'pi': {'extensions': ['./index.ts']}}), 'index.ts': '// test', 'settings.ts': '// test', 'ask.ts': '// test', 'prompt-borders.ts': '// test'}
         if missing_prompt:
             files.pop('prompt-borders.ts')
@@ -44,13 +44,14 @@ exit "${FAIL_PI:-0}"
         result = subprocess.run(['bash', str(SCRIPT), '--dir', str(self.dest), *args], env=dict(self.env, **(env or {})), text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         self.assertFalse(list(self.root.glob('.pi-workbench-ui-install.*')), 'temporary directory leaked')
+        self.assertFalse(pathlib.Path(str(self.dest) + '.install-lock').exists(), 'installer lock leaked')
         return result
     def test_install_register_and_no_git(self):
         self.run_install()
         self.assertTrue((self.dest / 'index.ts').is_file())
         self.assertFalse((self.dest / '.git').exists())
         self.assertIn('pi install ' + str(self.dest), self.log.read_text())
-        self.assertIn('/v0.4.0.tar.gz', self.log.read_text())
+        self.assertIn('/v0.4.1.tar.gz', self.log.read_text())
     def test_skip_registration(self):
         self.run_install('--no-register')
         self.assertNotIn('pi install', self.log.read_text())
@@ -80,7 +81,7 @@ exit "${FAIL_PI:-0}"
         self.run_install(success=False)
         self.assertFalse(self.dest.exists())
     def test_wrong_package_or_version(self):
-        for name, version in [('other', '0.4.0'), ('pi-workbench-ui', '9.9.9')]:
+        for name, version in [('other', '0.4.1'), ('pi-workbench-ui', '9.9.9')]:
             self.make_archive(name, version)
             self.run_install(success=False)
             self.assertFalse(self.dest.exists())
@@ -92,6 +93,50 @@ exit "${FAIL_PI:-0}"
         self.make_archive(version='0.3.0', missing_prompt=True)
         self.run_install('--version', 'v0.3.0')
         self.assertTrue((self.dest / 'index.ts').is_file())
+    def seed_install(self, version='0.3.0'):
+        self.make_archive(version=version, missing_prompt=version == '0.3.0')
+        self.run_install('--version', 'v' + version, '--no-register')
+        (self.dest / 'local-note').write_text('preserve me')
+        self.log.unlink()
+        self.make_archive()
+    def test_upgrade_preserves_old_tree_and_skips_registration(self):
+        self.seed_install()
+        self.run_install(env={'FAIL_PI': '1'})
+        self.assertEqual(json.loads((self.dest / 'package.json').read_text())['version'], '0.4.1')
+        self.assertTrue((self.dest / 'prompt-borders.ts').is_file())
+        backup, = self.root.glob('installed.backup.*')
+        self.assertEqual((backup / 'previous/local-note').read_text(), 'preserve me')
+        self.assertNotIn('pi install', self.log.read_text())
+    def test_current_version_is_unchanged(self):
+        self.seed_install('0.4.1')
+        self.assertIn('already up to date', self.run_install().stdout)
+        self.assertFalse(self.log.exists())
+        self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')
+    def test_newer_version_is_not_downgraded(self):
+        self.seed_install('0.10.0')
+        self.assertIn('refusing to downgrade', self.run_install(success=False).stderr)
+        self.assertFalse(self.log.exists())
+    def test_git_worktree_is_not_replaced(self):
+        self.seed_install()
+        (self.dest / '.git').write_text('gitdir: elsewhere')
+        self.assertIn('Git checkout detected', self.run_install(success=False).stderr)
+        self.assertFalse(self.log.exists())
+    def test_bad_upgrade_archive_leaves_previous_install(self):
+        self.seed_install()
+        self.make_archive(missing_prompt=True)
+        self.run_install(success=False)
+        self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')
+        self.assertFalse(list(self.root.glob('installed.backup.*')))
+    def test_failed_replacement_restores_previous_install(self):
+        self.seed_install()
+        self.fake('mv', '''#!/usr/bin/env bash
+for arg in "$@"; do case "$arg" in */.pi-workbench-ui-install.*/package) exit 1;; esac; done
+exec "$REAL_MV" "$@"
+''')
+        result = self.run_install(success=False, env={'REAL_MV': shutil.which('mv')})
+        self.assertIn('Restored previous installation', result.stderr)
+        self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')
+        self.assertFalse(list(self.root.glob('installed.backup.*')))
     def test_registration_failure_preserves_files(self):
         result = self.run_install(success=False, env={'FAIL_PI': '1'})
         self.assertTrue((self.dest / 'index.ts').is_file())
