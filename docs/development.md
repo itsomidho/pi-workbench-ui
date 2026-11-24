@@ -17,7 +17,7 @@ Runtime imports are supplied by Pi. No production dependencies are bundled. Test
 - `npm test`: state/renderer/settings regressions and synthetic performance checks.
 - `npm run check`: TypeScript syntax checking (not a full type check).
 - `npm run test:integration`: actual Pi RPC loading and settings/reset/enable through reload.
-- `npm run test:terminal`: Unix PTY startup, Unicode typing and 40/80/120-column resizing.
+- `npm run test:terminal`: Unix PTY startup, Unicode typing, resizing and real Ask choice/cancellation/free-text interactions.
 
 Python tests require Python 3 and a `pi` executable on PATH. Tests use temporary configuration and do not call a model API. They do not edit your settings or session.
 
@@ -28,6 +28,7 @@ See [QA.md](../QA.md) for unverified/manual coverage: real session restart/resum
 ## Files
 
 - `index.ts`: extension, UI components, tool presentation and session state.
+- `ask.ts`, `ask-test.mjs`, `ask-terminal-test.py`: Ask component/tool and keyboard/runtime tests.
 - `settings.ts`: validated persistent settings.
 - `test.mjs`: regression and performance suite.
 - `test-support.mjs`: portable Pi installation discovery.

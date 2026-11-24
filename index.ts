@@ -3,6 +3,7 @@ import { Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component }
 import { Type } from 'typebox';
 import { stripVTControlCharacters } from 'node:util';
 import { defaults, loadSettings, saveSetting, settingsPath } from './settings.ts';
+import { registerAsk } from './ask.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
@@ -129,6 +130,7 @@ export default function (pi: ExtensionAPI) {
   let settings = { ...defaults };
   let settingsError: string | undefined;
   try { settings = loadSettings(); } catch (error: any) { settings.enabled = false; settingsError = error.message; }
+  registerAsk(pi, () => settings.enabled, () => settings.padding);
   const pendingTitles = new Map<string, string>();
   const titles = new Map<string, string>();
   pi.registerTool({

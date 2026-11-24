@@ -1,6 +1,6 @@
 # Terminal QA
 
-Automated: `node test.mjs`, `python3 integration.py`, `python3 terminal-test.py`.
+Automated: `npm test`, `npm run check`, `npm run test:integration`, `npm run test:terminal`. Ask tests cover choices, typed answers, cancellation/abort, non-TUI safety and Unicode widths. Real Ask PTY tests cover selection, Escape cancellation, Other text and resizing without model requests.
 
 The node suite covers state restoration and legacy compatibility, input reset, actual native edit renderer reuse, Unicode and padding width matrices, usage-status layout, titles, output expansion and caching. RPC tests use an isolated configuration and exercise settings/reset/enable with actual Pi reloads. PTY smoke checks startup, Unicode typing, and resizing without model requests. These are not pixel-level visual or latency certification.
 

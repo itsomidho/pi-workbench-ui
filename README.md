@@ -6,6 +6,7 @@ This is a standalone Pi extension, not a Pi fork. [Pi Workbench](https://github.
 
 ## Features
 
+- **Ask box:** context, selectable answers, Other text input, keyboard submission and explicit cancellation.
 - **Task panel:** accent-colored heading, active/completed states, branch-aware persistence, and automatic reset of completed plans on the next prompt.
 - **Tool frames:** descriptive titles, padded command/output sections, expandable previews, elapsed/timeout labels, and status colors.
 - **Quiet defaults:** muted success borders, yellow running borders, red errors.
@@ -67,6 +68,12 @@ For multi-step work, ask Pi to maintain the task panel. The `todo_plan` tool rep
 The empty-panel hint suggests `/think`, which is provided by Pi Workbench—not this package. Without Workbench, ask Pi directly to create a plan.
 
 The `ui_title` tool gives the next call of a named tool an explicit task description. Shell commands can also begin with a descriptive `# comment`. Titles do not borrow unrelated TODO text.
+
+## Ask box
+
+Ask Pi to clarify a decision using `ask_user`. It opens a framed question with optional context, 1–12 choices and an **Other** typed answer. Use arrows to choose, Enter to submit and Escape (or Ctrl+C) to cancel. Empty typed answers are not submitted.
+
+Results contain `status: answered`, the selected text and zero-based index (or `custom: true` for typed answers). Cancellation returns `status: cancelled` and `answer: null`; it must never count as approval. The tool performs no action beyond collecting an answer. Non-TUI modes and disabled custom UI return `unavailable` with no answer. Pi reports a question-blocked state while waiting. Keep questions and context concise: long text is bounded on screen.
 
 ## Configure
 
