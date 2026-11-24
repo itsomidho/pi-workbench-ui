@@ -28,15 +28,28 @@ Extensions execute with your user permissions. Review code before installation.
 pi install git:github.com/itsomidho/pi-workbench-ui
 ```
 
-Run `/reload` in an existing Pi session. To install from a checkout:
+### Dedicated installation directory
+
+To install a separate checkout like Pi Workbench, instead of Pi's managed Git package:
 
 ```sh
-git clone https://github.com/itsomidho/pi-workbench-ui.git
-cd pi-workbench-ui
-pi install .
+git clone https://github.com/itsomidho/pi-workbench-ui.git ~/.pi-workbench-ui
+pi install ~/.pi-workbench-ui
+pi list
 ```
 
-Do not load the local and Git versions together. Use `pi list` to find and remove an old source before switching.
+If the directory already exists, inspect it before cloning or replacing it. When migrating from a development checkout or managed Git source, first use `pi list`, then remove the exact old source with `pi remove <old-source>`. Do not load both copies at once.
+
+### Update
+
+For the dedicated checkout, inspect local changes, then fast-forward only:
+
+```sh
+git -C ~/.pi-workbench-ui status --short
+git -C ~/.pi-workbench-ui pull --ff-only
+```
+
+If the checkout has local changes or cannot fast-forward, resolve them before updating; do not overwrite them. For a Pi-managed Git package, use `pi update --extensions` instead. Run `/reload` in an existing Pi session after installation or update. See [Installation and updates](docs/installation.md).
 
 ## Commands
 
@@ -92,10 +105,13 @@ A globally installed Pi is discovered automatically; `PI_INSTALL_ROOT` can point
 ## Remove
 
 ```sh
+# Dedicated checkout registration
+pi remove ~/.pi-workbench-ui
+# Or, for a Pi-managed Git package:
 pi remove git:github.com/itsomidho/pi-workbench-ui
 ```
 
-Use the exact source listed by `pi list` for local installations. Removing the package does not delete session history or settings.
+Use the exact source listed by `pi list`. Removing the registration does not delete the checkout, session history, or settings.
 
 ## License
 
