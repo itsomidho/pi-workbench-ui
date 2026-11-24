@@ -4,6 +4,8 @@ Automated: `npm test`, `npm run check`, `npm run test:integration`, `npm run tes
 
 The node suite covers state restoration and legacy compatibility, input reset, actual native edit renderer reuse, Unicode and padding width matrices, usage-status layout, titles, output expansion and caching. RPC tests use an isolated configuration and exercise settings/reset/enable with actual Pi reloads. PTY smoke checks startup, Unicode typing, and resizing without model requests. These are not pixel-level visual or latency certification.
 
+The reported duplicated assistant sentence occurs only on screen (saved content contains it once). Fullscreen settled redraw and `/ui redraw` are tested for lifecycle/operation and no message mutation. The original duplicate-row screen artifact has not been reproduced end-to-end; its resolution remains visually unverified.
+
 Manual release checklist (not yet verified):
 - Compare light/dark theme colors and change theme with existing tool history visible.
 - Resize a long transcript with real images and large expanded diffs in regular/fullscreen modes.

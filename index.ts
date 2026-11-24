@@ -1,20 +1,24 @@
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from '@earendil-works/pi-coding-agent';
-import { Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component } from '@earendil-works/pi-tui';
+import { Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI } from '@earendil-works/pi-tui';
 import { Type } from 'typebox';
 import { stripVTControlCharacters } from 'node:util';
 import { defaults, loadSettings, saveSetting, settingsPath } from './settings.ts';
 import { registerAsk } from './ask.ts';
+import { registerPromptBorders } from './prompt-borders.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
 const empty = (): Plan => ({ title: 'Tasks', items: [] });
 const clean = (s: string) => s.replace(/[\x00-\x1f\x7f-\x9f]/g, ' ');
+// Native renderers can leave a diff background active at a wrapped line end.
+// Reset all SGR attributes before painting padding or another component.
+const closeStyles = (text: string) => text.includes('\x1b[') ? text + '\x1b[0m' : text;
 
 export function gutterLine(line: string, width: number, padding = 1): string {
   const pad = Math.min(padding, Math.max(0, Math.floor((width - 1) / 2)));
   const inner = Math.max(0, width - pad * 2);
   const text = truncateToWidth(line, inner);
-  return ' '.repeat(pad) + text + ' '.repeat(Math.max(0, inner - visibleWidth(text)) + pad);
+  return ' '.repeat(pad) + closeStyles(text) + ' '.repeat(Math.max(0, inner - visibleWidth(text)) + pad);
 }
 
 function gutter(child: Component, padding = 1): Component {
@@ -42,7 +46,7 @@ export function frame(child: Component, label: string | (() => string), edge: 't
   return {
     invalidate() { child.invalidate(); },
     render(width) {
-      if (width < 4) return child.render(width).map(line => truncateToWidth(line, width));
+      if (width < 4) return child.render(width).map(line => closeStyles(truncateToWidth(line, width)));
       const inner = width - 2;
       const lead = '─'.repeat(Math.min(2, inner));
       const title = truncateToWidth(` ${typeof label === 'function' ? label() : label} `, inner - visibleWidth(lead), '');
@@ -58,7 +62,7 @@ export function frame(child: Component, label: string | (() => string), edge: 't
         const text = stripVTControlCharacters(line).trim();
         return text && (literalOutput || (text !== '(no output)' && !/^(?:Took|Elapsed) \d+(?:\.\d+)?(?:ms|s|m|h)(?:\s+\d+(?:\.\d+)?[smh])*$/.test(text)));
       });
-      const body = (outputHeading && !hasOutput ? [] : lines).map(line => side + ' '.repeat(padding) + line + ' '.repeat(Math.max(0, contentWidth - visibleWidth(line)) + padding) + side);
+      const body = (outputHeading && !hasOutput ? [] : lines).map(line => side + ' '.repeat(padding) + closeStyles(line) + ' '.repeat(Math.max(0, contentWidth - visibleWidth(line)) + padding) + side);
       const heading = truncateToWidth(' Output ', inner - visibleWidth(lead), '');
       const separator = color('├' + lead + heading + '─'.repeat(Math.max(0, inner - visibleWidth(lead) - visibleWidth(heading))) + '┤');
       const blank = side + ' '.repeat(inner) + side;
@@ -131,6 +135,8 @@ export default function (pi: ExtensionAPI) {
   let settingsError: string | undefined;
   try { settings = loadSettings(); } catch (error: any) { settings.enabled = false; settingsError = error.message; }
   registerAsk(pi, () => settings.enabled, () => settings.padding);
+  registerPromptBorders(pi, () => settings);
+  let activeUI: TUI | undefined;
   const pendingTitles = new Map<string, string>();
   const titles = new Map<string, string>();
   pi.registerTool({
@@ -147,12 +153,23 @@ export default function (pi: ExtensionAPI) {
     const title = pendingTitles.get(event.toolName);
     if (title) { titles.set(event.toolCallId, title); pendingTitles.delete(event.toolName); pi.appendEntry('workbench-title', { id: event.toolCallId, title }); }
   });
-  pi.on('agent_settled', () => pendingTitles.clear());
+  pi.on('agent_settled', () => {
+    pendingTitles.clear();
+    // A clean fullscreen repaint clears stale rows left after streaming or
+    // component height changes. Never deduplicate or modify message content.
+    if (settings.enabled && activeUI?.mode === 'fullscreen') activeUI.requestRender(true);
+  });
+  pi.on('session_shutdown', () => { activeUI = undefined; });
   pi.registerCommand('ui', {
-    description: 'reset | enable | settings | set <key> <value>',
+    description: 'reset | enable | redraw | settings | set <key> <value>',
     handler: async (args, ctx) => {
       const [action, key, ...parts] = args.trim().split(/\s+/);
       try {
+        if (action === 'redraw') {
+          if (activeUI) activeUI.requestRender(true);
+          else ctx.ui.notify('No active custom UI to redraw.', 'info');
+          return;
+        }
         if (action === 'reset' || action === 'enable') settings = saveSetting(settings, 'enabled', action === 'enable');
         else if (action === 'set') {
           let value: unknown; try { value = JSON.parse(parts.join(' ')); } catch { value = parts.join(' '); }
@@ -237,6 +254,11 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.ui.getEditorComponent()) {
       ctx.ui.setEditorComponent((tui, theme, keys) => {
         class WorkbenchEditor extends CustomEditor {
+          // Pi reapplies editorPaddingX after constructing custom editors and
+          // when its settings change. Keep our content aligned with our border.
+          override setPaddingX(_padding: number): void {
+            super.setPaddingX(settings.padding);
+          }
           protected renderTopBorder(width: number, hiddenLineCount: number): string {
             const inset = Math.min(settings.padding, Math.max(0, Math.floor((width - 1) / 2)));
             return ' '.repeat(inset) + super.renderTopBorder(Math.max(0, width - inset * 2), hiddenLineCount) + ' '.repeat(inset);
@@ -256,13 +278,17 @@ export default function (pi: ExtensionAPI) {
       });
     }
     ctx.ui.setFooter((tui, theme, data) => {
+      activeUI = tui;
       const unsubscribe = data.onBranchChange(() => tui.requestRender());
       let leaf: string | null | undefined;
       let stats = footerStats([], []);
       let cachedUsage: ReturnType<ExtensionContext['getContextUsage']>;
       let usageModel: unknown;
       return {
-        dispose: unsubscribe,
+        dispose() {
+          unsubscribe();
+          if (activeUI === tui) activeUI = undefined;
+        },
         // Theme invalidation must not rebuild session projections on each key.
         invalidate() {},
         render(width) {

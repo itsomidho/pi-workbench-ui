@@ -3,12 +3,12 @@
 main() {
 set -euo pipefail
 
-version=v0.3.0
+version=v0.4.0
 destination="${HOME:?HOME must be set}/.pi-workbench-ui"
 register=true
 usage() {
   printf '%s\n' 'Usage: bash install.sh [--version vX.Y.Z] [--dir /absolute/path] [--no-register]' \
-    'Defaults: --version v0.3.0 --dir ~/.pi-workbench-ui' \
+    'Defaults: --version v0.4.0 --dir ~/.pi-workbench-ui' \
     'Requires Bash, curl, tar, Node.js 22.13+, GNU mv, and Pi (unless --no-register).' \
     'Existing directories and symlinks are never replaced.'
 }
@@ -24,7 +24,7 @@ while [ "$#" -gt 0 ]; do
     *) fail "Unknown option: $1" ;;
   esac
 done
-[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Version must be a release tag such as v0.3.0'
+[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Version must be a release tag such as v0.4.0'
 # Normalize trailing slashes so dangling symlinks are detected too.
 while [[ "$destination" = */ ]]; do destination="${destination%/}"; done
 [[ "$destination" = /* ]] && [ "$destination" != / ] || fail 'Installation directory must be an absolute path other than /'
@@ -52,7 +52,10 @@ const pkg = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'ut
 if (pkg.name !== 'pi-workbench-ui' || pkg.version !== version || !pkg.pi?.extensions?.includes('./index.ts')) {
   throw new Error('Unexpected package name, version or extension manifest');
 }
-for (const file of ['index.ts', 'settings.ts', 'ask.ts']) {
+const required = ['index.ts', 'settings.ts', 'ask.ts'];
+const [major, minor] = pkg.version.split('.').map(Number);
+if (major > 0 || minor >= 4) required.push('prompt-borders.ts');
+for (const file of required) {
   const stat = fs.lstatSync(path.join(directory, file));
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Invalid package file: ${file}`);
 }

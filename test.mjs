@@ -15,7 +15,7 @@ const jiti = createJiti(import.meta.url, { alias: {
   'typebox': require.resolve('typebox'),
 } });
 const { default: extension, frame, validPlan, gutterLine, footerStats, toolTitle, preview } = await jiti.import('./index.ts');
-const { visibleWidth, Text } = await import(require.resolve('@earendil-works/pi-tui'));
+const { visibleWidth, Text, CURSOR_MARKER } = await import(require.resolve('@earendil-works/pi-tui'));
 const events = {}, commands = {}, entries = [], tools = [], notifications = [];
 let resolver, widget, footerFactory, editorFactory;
 const pi = {
@@ -95,6 +95,21 @@ assert.ok(!singleIndicatorFooter.render(80).join('\n').includes('Thinking'));
 singleIndicatorFooter.dispose();
 const editor = editorFactory({ ...tui, terminal: { rows: 40, columns: 80 } }, { borderColor: s => s }, { matches: () => false });
 assert.equal(editor.embedWorkingStatus, true);
+// Pi sets the host's padding on a custom editor after construction. Its
+// default zero must not move our input/cursor left of the inset borders.
+for (const hostPadding of [0, 3, 0]) {
+ editor.setPaddingX(hostPadding);
+ assert.equal(editor.getPaddingX(), 1);
+}
+editor.focused = true;
+for (const width of [10, 40, 80]) {
+ const lines = editor.render(width);
+ const cursorLine = lines.find(line => line.includes(CURSOR_MARKER));
+ assert.ok(cursorLine, 'editor must expose its hardware cursor marker');
+ assert.equal(visibleWidth(cursorLine.split(CURSOR_MARKER)[0]), 1, 'cursor must share border inset');
+ assert.ok(lines[0].startsWith(' '));
+ assert.ok(lines.at(-1).startsWith(' '));
+}
 editor.setWorkingStatusIndicator({ renderInBorder: () => '● Working', renderSpinnerInBorder: () => '●' });
 for (const width of [10, 40, 80]) {
  const top = editor.renderTopBorder(width, 0);
@@ -148,6 +163,40 @@ for (const text of ['', '  \n\n', '(no output)\n\nTook 0.2s', '\nElapsed 1.2s'])
 const realOutput = frame(new Text('hello\nTook 0.2s', 0, 0), 'done', 'bottom', s => s, true);
 assert.match(realOutput.render(80).join('\n'), /├── Output/);
 assert.match(realOutput.render(80).join('\n'), /hello/);
+// Native diff highlighting may end a line without resetting the background.
+// Simulate terminal SGR state rather than just looking for escape sequences.
+function paintedCells(line) {
+ let background = false;
+ const cells = [];
+ for (const match of line.matchAll(/\x1b\[([0-9;]*)m|([^\x1b])/gu)) {
+  if (match[1] !== undefined) {
+   const values = (match[1] || '0').split(';').map(Number);
+   if (values[0] === 48 || (values[0] >= 40 && values[0] <= 47) || (values[0] >= 100 && values[0] <= 107)) background = true;
+   if (values.includes(0) && values[0] !== 48 || values.includes(49)) background = false;
+  } else cells.push({ text: match[2], background });
+ }
+ return cells;
+}
+const diffBg = '\x1b[48;2;60;120;90m';
+const borderFg = text => '\x1b[90m' + text + '\x1b[39m';
+for (const padding of [0, 1, 2, 3]) for (const width of [5, 10, 40, 80]) {
+ const child = { invalidate() {}, render(w) { return [diffBg + 'x'.repeat(w) + '\x1b[39m']; } };
+ const framed = frame(child, 'diff', 'top', borderFg, false, { ...defaultsForAnsi(), padding });
+ for (const line of framed.render(width)) {
+  assert.equal(visibleWidth(line), width);
+  for (const cell of paintedCells(line)) {
+   if (cell.text === '│' || cell.text === ' ') assert.equal(cell.background, false, 'highlight leaked into padding/border');
+   if (cell.text === 'x') assert.equal(cell.background, true, 'content highlight was stripped');
+  }
+ }
+}
+function defaultsForAnsi() { return { padding: 1, verticalPadding: 1 }; }
+for (const width of [4, 8, 40]) {
+ const cells = paintedCells(gutterLine(diffBg + 'xx', width));
+ assert.equal(cells[0].background, false);
+ assert.equal(cells.at(-1).background, false);
+ assert.ok(cells.filter(cell => cell.text === 'x').every(cell => cell.background));
+}
 // Both halves follow the shared tool state, including completion without timing.
 for (const [partial, error, expected] of [[true, false, 'warning'], [false, false, 'borderMuted'], [false, true, 'error']]) {
  const colors = [];
@@ -325,6 +374,18 @@ assert.equal(reloads, 3);
 await commands.ui.handler('set padding 99', commandCtx);
 assert.equal(reloads, 3);
 assert.equal(loadSettings().padding, 2);
+for (const padding of [0, 1, 2, 3]) {
+ await commands.ui.handler(`set padding ${padding}`, commandCtx);
+ const aligned = editorFactory({ ...tui, terminal: { rows: 40, columns: 80 } }, { borderColor: s => s }, { matches: () => false });
+ aligned.setPaddingX(padding === 0 ? 3 : 0);
+ assert.equal(aligned.getPaddingX(), padding);
+ aligned.focused = true;
+ const lines = aligned.render(80);
+ const cursor = lines.find(line => line.includes(CURSOR_MARKER));
+ assert.equal(visibleWidth(cursor.split(CURSOR_MARKER)[0]), padding);
+ assert.equal(visibleWidth(lines[0].match(/^ */)[0]), padding);
+ assert.equal(visibleWidth(lines.at(-1).match(/^ */)[0]), padding);
+}
 await tools.find(tool => tool.name === 'ui_title').execute('title', { tool: 'bash', description: 'Verify packages' });
 events.tool_call({ toolName: 'bash', toolCallId: 'described' });
 const titled = resolver('bash', () => original).renderCall({}, theme, { state: {}, toolCallId: 'described' });
@@ -342,5 +403,24 @@ assert.match(frame(new Text('Took 1.0s', 0, 0), 'done', 'bottom', s => s, true, 
 const historyStart = performance.now();
 assert.equal(footerStats(Array(20000).fill(response), [response]).totals.input, 2000000);
 console.log(`PERF: 20000-entry statistics scan ${(performance.now() - historyStart).toFixed(2)}ms`);
+// A stale fullscreen screen row must be cleared without changing history.
+const redraws = [];
+const redrawData = { onBranchChange: () => () => {}, getGitBranch: () => undefined, getExtensionStatuses: () => new Map() };
+const screen = { mode: 'fullscreen', requestRender: force => redraws.push(force) };
+const redrawFooter = footerFactory(screen, theme, redrawData);
+const entrySnapshot = JSON.stringify(entries);
+events.agent_settled();
+assert.deepEqual(redraws, [true]);
+assert.equal(JSON.stringify(entries), entrySnapshot);
+await commands.ui.handler('redraw', commandCtx);
+assert.deepEqual(redraws, [true, true]);
+redrawFooter.dispose();
+events.agent_settled();
+assert.equal(redraws.length, 2);
+const regularFooter = footerFactory({ ...screen, mode: 'regular' }, theme, redrawData);
+events.agent_settled();
+assert.equal(redraws.length, 2, 'regular-mode scrollback must not be forcibly redrawn on settle');
+regularFooter.dispose();
+console.log('PASS: fullscreen redraw recovery without message mutation');
 console.log('PASS: settings/recovery/explicit titles/preview/padding matrix');
 console.log('PASS: integrated footer totals/routing/responsive layout, completed-plan reset and persistence, native component reuse, loading, plan validation, persistence/tree reset/reload, Unicode widths, footer statuses/disposal, tool frames/timing/errors and execution isolation');

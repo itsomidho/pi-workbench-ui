@@ -34,6 +34,7 @@ See [QA.md](../QA.md) for unverified/manual coverage: real session restart/resum
 - `index.ts`: extension, UI components, tool presentation and session state.
 - `ask.ts`, `ask-test.mjs`, `ask-terminal-test.py`: Ask component/tool and keyboard/runtime tests.
 - `settings.ts`: validated persistent settings.
+- `prompt-borders.ts`, `prompt-borders-test.mjs`: message decoration, native rendering and lifecycle regressions.
 - `test.mjs`: regression and performance suite.
 - `test-support.mjs`: portable Pi installation discovery.
 - `integration.py`, `terminal-test.py`: isolated runtime smoke tests.

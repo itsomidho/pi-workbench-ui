@@ -1,14 +1,15 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-export const defaults = { enabled: true, padding: 1, verticalPadding: 1, todos: true, footer: 'detailed', previewLines: 12, pendingColor: 'borderMuted', runningColor: 'warning', successColor: 'borderMuted', errorColor: 'error' };
+export const defaults = { enabled: true, padding: 1, verticalPadding: 1, todos: true, promptBorders: true, promptBorderColor: '#5F929B', footer: 'detailed', previewLines: 12, pendingColor: 'borderMuted', runningColor: 'warning', successColor: 'borderMuted', errorColor: 'error' };
 export type UISettings = typeof defaults;
 const colors = ['borderMuted', 'muted', 'dim', 'accent', 'warning', 'success', 'error'];
 export function validateSetting(key: string, value: unknown) {
-  if (['enabled', 'todos'].includes(key)) return typeof value === 'boolean';
+  if (['enabled', 'todos', 'promptBorders'].includes(key)) return typeof value === 'boolean';
   if (['padding', 'verticalPadding'].includes(key)) return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 3;
   if (key === 'previewLines') return Number.isInteger(value) && Number(value) >= 3 && Number(value) <= 100;
   if (key === 'footer') return ['compact', 'detailed'].includes(String(value));
+  if (key === 'promptBorderColor') return typeof value === 'string' && (colors.includes(value) || /^#[0-9a-f]{6}$/i.test(value));
   if (key.endsWith('Color') && key in defaults) return colors.includes(String(value));
   return false;
 }

@@ -59,7 +59,7 @@ export class AskBox {
     if (start) content.push(th.fg('dim', '↑ more choices'));
     options.slice(start, start + 5).forEach((text, i) => {
       const selected = start + i === this.selected;
-      content.push(th.fg(selected ? 'accent' : 'muted', truncateToWidth(`${selected ? '▸' : ' '} ${selected ? '◉' : '○'}  ${safe(text)}`, inner)));
+      content.push(th.fg(selected ? 'accent' : 'muted', truncateToWidth(`${selected ? '▸' : ' '} ${selected ? '(*)' : '( )'}  ${safe(text)}`, inner)));
     });
     if (start + 5 < options.length) content.push(th.fg('dim', '↓ more choices'));
     if (this.editing) { content.push(''); content.push(...this.input.render(inner)); }
