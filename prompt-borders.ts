@@ -27,6 +27,29 @@ export function registerPromptBorders(pi: ExtensionAPI, getSettings: () => UISet
     function bordered(this: UserMessageComponent, width: number): string[] {
       const current = getSettings();
       if (!current.enabled || !current.promptBorders || width < 8) return original.call(this, width);
+      if (current.promptStyle === 'right') {
+        const label = truncateToWidth(current.promptLabel, Math.max(0, width - 11));
+        const prefixWidth = label ? visibleWidth(label) + 2 : 0;
+        const nativeWidth = width - 1 - prefixWidth;
+        const source = original.call(this, nativeWidth);
+        if (!source.length) return source;
+        const fill = (text: string) => ctx.ui.theme.bg('userMessageBg', text);
+        const bar = fill(paint('▉').slice(reset.length));
+        const indent = Math.min(pi.getSettings?.().outputPad ?? 1, nativeWidth);
+        const key = `right:${width}:${indent}:${label}:${bar}`;
+        const previous = cache.get(this);
+        if (previous?.source === source && previous.key === key) return previous.lines;
+        const first = source.findIndex(line => stripVTControlCharacters(line).trim() !== '');
+        const lines = source.map((nativeLine, index) => {
+          // A normal first text row carries no zone marker (Pi puts those on its padding rows).
+          const line = label && index === first
+            ? fill(' '.repeat(indent) + label + ': ') + sliceByColumn(nativeLine, indent, nativeWidth - indent)
+            : (prefixWidth ? fill(' '.repeat(prefixWidth)) : '') + nativeLine;
+          return line + reset + fill(' '.repeat(Math.max(0, width - 1 - visibleWidth(line)))) + bar;
+        });
+        cache.set(this, { source, key, lines });
+        return lines;
+      }
       const pad = Math.min(current.padding, Math.max(0, Math.floor((width - 6) / 2)));
       const panelWidth = width - pad * 2;
       // Keep the thin outline aligned with the shared panel gutter.

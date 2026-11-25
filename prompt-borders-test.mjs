@@ -18,6 +18,16 @@ let hostPadding = 1;
 registerPromptBorders({ on: (event, fn) => { events[event] = fn; }, getSettings: () => ({ outputPad: hostPadding }) }, () => settings);
 const context = { mode: 'tui', ui: { theme } };
 events.session_start({}, context);
+assert.equal(settings.promptStyle, 'right');
+const rightPrompt = new UserMessageComponent('Sample 日本語\n\nSecond paragraph');
+for (const width of [8, 12, 40, 80]) {
+ const rows = rightPrompt.render(width).map(stripVTControlCharacters);
+ assert.ok(rows.every(line => line.endsWith('▉') && visibleWidth(line) === width));
+ assert.ok(!rows.some(line => /[╭╰]/.test(line)));
+ if (width >= 40) assert.ok(rows.some(line => line.includes('You: Sample 日本語')));
+}
+assert.equal(rightPrompt.render(80).length, native.call(rightPrompt, 74).length);
+settings.promptStyle = 'outline';
 assert.notStrictEqual(UserMessageComponent.prototype.render, native);
 for (const padding of [0, 1, 2, 3]) {
  settings.padding = padding;

@@ -11,7 +11,7 @@ This is a standalone Pi extension, not a Pi fork. [Pi Workbench](https://github.
 - **Tool frames:** descriptive titles, padded command/output sections, expandable previews, elapsed/timeout labels, and status colors.
 - **Quiet defaults:** muted success borders, yellow running borders, red errors.
 - **Integrated footer:** directory, branch, session, token/cache/cost statistics, context usage, selected/last physical model, and extension statuses.
-- **Prompt presentation:** working status in the editor border and a muted-cyan outline around submitted messages, preserving the theme background.
+- **Prompt presentation:** working status in the editor border. Submitted prompts keep Pi’s native background and spacing, adding an inline `You:` label and a thick right-side bar. Native, outline, and left-accent styles are also available.
 - **Recovery:** disable custom surfaces without uninstalling the extension.
 - **Cached rendering:** avoid repeating session scans and context projections while typing.
 
@@ -31,7 +31,7 @@ Extensions execute with your user permissions. Review code before installation.
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-This downloads the tagged **v0.5.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+This downloads the tagged **v0.6.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
 
 Alternatively, let Pi manage a Git package:
 
@@ -97,8 +97,8 @@ Results contain `status: answered`, the selected text and zero-based index (or `
 /ui set footer compact
 /ui set todos false
 /ui set successColor borderMuted
-/ui set promptBorders false
-/ui set promptStyle accent
+/ui set promptBorders true
+/ui set promptStyle right
 /ui set promptLabel You
 /ui set promptBorderColor "#5F929B"
 ```
@@ -108,7 +108,7 @@ Settings live at `~/.config/pi-workbench/ui.json`; `PI_WORKBENCH_UI_CONFIG` over
 ## Compatibility and limitations
 
 - The extension replaces the footer and wraps native tool rendering; other extensions replacing the same surfaces can conflict.
-- Submitted-message borders decorate Pi's exported user-message renderer because Pi has no dedicated hook for it. Tested with Pi 1.6.0; other extensions wrapping that method may conflict. Disable with `/ui set promptBorders false`.
+- Submitted-message borders decorate Pi's exported user-message renderer because Pi has no dedicated hook for it. Tested with Pi 1.6.0; other extensions wrapping that method may conflict. Return to native rendering with `/ui set promptBorders false`.
 - Existing custom editors are left alone. `/ui reset` restores native surfaces plus any other installed extensions.
 - The built-in edit tool gets matching frames; other self-rendering tools retain their own UI.
 - The physical-model label describes the latest recorded assistant response, not the next routing decision.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- Default to Pi’s native submitted-prompt panel with a thick right-side bar and inline `You:` label. Existing explicit settings are preserved.
+
 ## 0.5.0
 
 - Add a switchable solid accent-panel prompt style with a configurable inline `You:`/custom-name label and aligned continuations; system usernames are not exposed automatically.
