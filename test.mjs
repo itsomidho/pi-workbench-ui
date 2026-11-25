@@ -200,7 +200,7 @@ for (const width of [4, 8, 40]) {
 // Both halves follow the shared tool state, including completion without timing.
 for (const [partial, error, expected] of [[true, false, 'warning'], [false, false, 'borderMuted'], [false, true, 'error']]) {
  const colors = [];
- const coloredTheme = { fg: (color, s) => { colors.push(color); return s; } };
+ const coloredTheme = { fg: (color, s) => { if (/[│╭╮╰╯├┤─]/.test(s)) colors.push(color); return s; } };
  const context = { state: {}, executionStarted: true, isError: error };
  const top = renderers.renderCall({}, coloredTheme, context);
  const bottom = renderers.renderResult({}, { isPartial: partial }, coloredTheme, context);

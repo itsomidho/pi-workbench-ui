@@ -8,6 +8,7 @@ Run `/ui settings` to inspect active settings and their file path. Settings chan
 | padding | 1 | Integer 0–3 |
 | verticalPadding | 1 | Integer 0–3 |
 | todos | true | true / false |
+| tokenUsage | true | Show shared-turn/tool-model labels and latest-turn footer status |
 | promptBorders | true | true / false |
 | promptStyle | right | right / outline / accent |
 | promptLabel | You | Text up to 60 characters; empty string hides it |

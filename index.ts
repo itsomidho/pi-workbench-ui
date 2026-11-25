@@ -5,6 +5,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { defaults, loadSettings, saveSetting, settingsPath } from './settings.ts';
 import { registerAsk } from './ask.ts';
 import { registerPromptBorders } from './prompt-borders.ts';
+import { registerTokenUsage } from './token-usage.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
@@ -39,7 +40,7 @@ function gutter(child: Component, padding = 1): Component {
 
 // Keep the native renderers: syntax highlighting, diffs, images, and expansion
 // still belong to Pi. Only add a thin frame; never intercept execution.
-export function frame(child: Component, label: string | (() => string), edge: 'top' | 'bottom', color: (s: string) => string, outputHeading = false, layout = defaults, literalOutput = false): Component {
+export function frame(child: Component, label: string | (() => string), edge: 'top' | 'bottom', color: (s: string) => string, outputHeading = false, layout = defaults, literalOutput = false, rightLabel?: () => string): Component {
   let previous: string[] | undefined;
   let cached: string[] = [];
   let cacheKey = '';
@@ -50,12 +51,16 @@ export function frame(child: Component, label: string | (() => string), edge: 't
       const inner = width - 2;
       const lead = '─'.repeat(Math.min(2, inner));
       const title = truncateToWidth(` ${typeof label === 'function' ? label() : label} `, inner - visibleWidth(lead), '');
-      const rule = color((edge === 'top' ? '╭' : '╰') + lead + title + '─'.repeat(Math.max(0, inner - visibleWidth(lead) - visibleWidth(title))) + (edge === 'top' ? '╮' : '╯'));
+      const usage = edge === 'bottom' ? rightLabel?.() ?? '' : '';
+      const right = usage ? ` ${usage} ──` : '';
+      const inlineUsage = right && visibleWidth(lead + title + right) + 1 <= inner;
+      const corner = edge === 'top' ? '╮' : '╯';
+      const rule = color((edge === 'top' ? '╭' : '╰') + lead + title + '─'.repeat(Math.max(0, inner - visibleWidth(lead) - visibleWidth(title) - (inlineUsage ? visibleWidth(right) : 0)))) + (inlineUsage ? ` ${usage} ` + color('──' + corner) : color(corner));
       const padding = Math.min(layout.padding, Math.max(0, Math.floor((inner - 1) / 2)));
       const contentWidth = inner - padding * 2;
       const lines = child.render(contentWidth);
       const side = color('│');
-      const key = `${width}:${rule}:${side}`;
+      const key = `${width}:${rule}:${side}:${usage}`;
       if (lines === previous && key === cacheKey) return cached;
       previous = lines; cacheKey = key;
       const hasOutput = lines.some(line => {
@@ -67,7 +72,8 @@ export function frame(child: Component, label: string | (() => string), edge: 't
       const separator = color('├' + lead + heading + '─'.repeat(Math.max(0, inner - visibleWidth(lead) - visibleWidth(heading))) + '┤');
       const blank = side + ' '.repeat(inner) + side;
       const space = Array(layout.verticalPadding).fill(blank);
-      return cached = edge === 'top' ? [rule, ...space, ...body, ...space] : [...(outputHeading && hasOutput ? [separator, ...space] : []), ...body, ...(hasOutput ? space : []), rule];
+      const usageRows = usage && !inlineUsage ? wrapTextWithAnsi(usage, contentWidth).map(line => side + ' '.repeat(padding) + color(truncateToWidth(line, contentWidth)) + ' '.repeat(Math.max(0, contentWidth - visibleWidth(line)) + padding) + side) : [];
+      return cached = edge === 'top' ? [rule, ...space, ...body, ...space] : [...(outputHeading && hasOutput ? [separator, ...space] : []), ...body, ...(hasOutput ? space : []), ...usageRows, rule];
     },
   };
 }
@@ -137,6 +143,7 @@ export default function (pi: ExtensionAPI) {
   registerAsk(pi, () => settings.enabled, () => settings.padding);
   registerPromptBorders(pi, () => settings);
   let activeUI: TUI | undefined;
+  const tokenUsage = registerTokenUsage(pi, () => settings.enabled && settings.tokenUsage, () => activeUI?.requestRender());
   const pendingTitles = new Map<string, string>();
   const titles = new Map<string, string>();
   pi.registerTool({
@@ -381,7 +388,7 @@ export default function (pi: ExtensionAPI) {
           return `${options.isPartial ? 'running' : context.isError ? 'error' : 'done'}${timing}`;
         };
         state.workbenchBorderStatus = options.isPartial ? settings.runningColor : context.isError ? settings.errorColor : settings.successColor;
-        return remember(gutter(frame(preview(child, settings.previewLines, options.expanded || context.isError, result.content?.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n') ?? '', ['bash', 'powershell'].includes(_name)), label, 'bottom', s => theme.fg(state.workbenchBorderStatus, s), true, settings, result.content?.some((c: any) => c.type === 'text' && c.text?.trim() && c.text.trim() !== '(no output)')), settings.padding), child);
+        return remember(gutter(frame(preview(child, settings.previewLines, options.expanded || context.isError, result.content?.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n') ?? '', ['bash', 'powershell'].includes(_name)), label, 'bottom', s => theme.fg(state.workbenchBorderStatus, s), true, settings, result.content?.some((c: any) => c.type === 'text' && c.text?.trim() && c.text.trim() !== '(no output)'), () => settings.tokenUsage ? tokenUsage.label(context.toolCallId, theme) : ''), settings.padding), child);
       },
     };
   });

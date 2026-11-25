@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+- Add provider-reported shared-turn usage to tool boxes and latest-turn footer status; keep any tool-reported model usage separate.
+- Color input/output counts independently while preserving border status colors and the muted footer.
+- Preserve cache distinctions and unknown values; rebuild usage labels from the active branch without extra render-time session scans.
+- Add real session-resume coverage and handle multiple buffered RPC response/status lines reliably.
+
 ## 0.6.0
 
 - Default to Pi’s native submitted-prompt panel with a thick right-side bar and inline `You:` label. Existing explicit settings are preserved.

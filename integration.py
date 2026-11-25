@@ -8,20 +8,29 @@ with tempfile.TemporaryDirectory(prefix='workbench-ui-rpc-') as directory:
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
+    pending = bytearray()
     def request(identifier, **payload):
         process.stdin.write(json.dumps(dict(id=identifier, **payload)) + '\n')
         process.stdin.flush()
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            if not selector.select(timeout=1):
-                continue
-            line = process.stdout.readline()
-            if not line:
-                raise RuntimeError('Pi exited: ' + process.stderr.read())
-            event = json.loads(line)
-            if event.get('type') == 'response' and event.get('id') == identifier:
-                assert event.get('success'), event
-                return event
+            # Use one byte buffer: readline() can prefetch later responses,
+            # leaving selectors waiting on an empty OS pipe despite buffered data.
+            if b'\n' not in pending:
+                if not selector.select(timeout=1):
+                    continue
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
+                    raise RuntimeError('Pi exited: ' + process.stderr.read())
+                pending.extend(chunk)
+            while b'\n' in pending:
+                end = pending.index(b'\n')
+                line = bytes(pending[:end])
+                del pending[:end + 1]
+                event = json.loads(line)
+                if event.get('type') == 'response' and event.get('id') == identifier:
+                    assert event.get('success'), event
+                    return event
         raise TimeoutError(identifier)
     try:
         result = request('commands', type='get_commands')

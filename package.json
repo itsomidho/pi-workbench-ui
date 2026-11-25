@@ -1,6 +1,6 @@
 {
   "name": "pi-workbench-ui",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "A configurable terminal UI for Pi: task panels, tool frames, and an integrated status footer.",
@@ -12,11 +12,11 @@
   "keywords": ["pi-package", "pi-extension", "terminal-ui", "todo"],
   "engines": { "node": ">=22.13.0" },
   "scripts": {
-    "test": "node test.mjs && node ask-test.mjs && node prompt-borders-test.mjs",
+    "test": "node test.mjs && node ask-test.mjs && node prompt-borders-test.mjs && node token-usage-test.mjs",
     "test:integration": "python3 integration.py",
     "test:installer": "bash -n install.sh && python3 installer-test.py",
-    "test:terminal": "python3 terminal-test.py && python3 ask-terminal-test.py",
-    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check settings.ts && node --experimental-strip-types --check ask.ts && node --experimental-strip-types --check prompt-borders.ts"
+    "test:terminal": "python3 terminal-test.py && python3 ask-terminal-test.py && python3 token-usage-terminal-test.py",
+    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check settings.ts && node --experimental-strip-types --check ask.ts && node --experimental-strip-types --check prompt-borders.ts && node --experimental-strip-types --check token-usage.ts"
   },
   "peerDependencies": { "@earendil-works/pi-coding-agent": "*", "@earendil-works/pi-tui": "*", "typebox": "*" },
   "pi": { "extensions": ["./index.ts"] }

@@ -10,6 +10,7 @@ This is a standalone Pi extension, not a Pi fork. [Pi Workbench](https://github.
 - **Task panel:** accent-colored heading, active/completed states, branch-aware persistence, and automatic reset of completed plans on the next prompt.
 - **Tool frames:** descriptive titles, padded command/output sections, expandable previews, elapsed/timeout labels, and status colors.
 - **Quiet defaults:** muted success borders, yellow running borders, red errors.
+- **Turn usage:** provider-reported input/output and cache tokens on tool boxes, with shared-turn and tool-reported usage clearly separated.
 - **Integrated footer:** directory, branch, session, token/cache/cost statistics, context usage, selected/last physical model, and extension statuses.
 - **Prompt presentation:** working status in the editor border. Submitted prompts keep Pi’s native background and spacing, adding an inline `You:` label and a thick right-side bar. Native, outline, and left-accent styles are also available.
 - **Recovery:** disable custom surfaces without uninstalling the extension.
@@ -31,7 +32,7 @@ Extensions execute with your user permissions. Review code before installation.
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-This downloads the tagged **v0.6.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+This downloads the tagged **v0.7.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
 
 Alternatively, let Pi manage a Git package:
 
@@ -87,6 +88,16 @@ The `ui_title` tool gives the next call of a named tool an explicit task descrip
 Ask Pi to clarify a decision using `ask_user`. It opens a framed question with optional context, 1–12 choices and an **Other** typed answer. Use arrows to choose, Enter to submit and Escape (or Ctrl+C) to cancel. Empty typed answers are not submitted.
 
 Results contain `status: answered`, the selected text and zero-based index (or `custom: true` for typed answers). Cancellation returns `status: cancelled` and `answer: null`; it must never count as approval. The tool performs no action beyond collecting an answer. Non-TUI modes and disabled custom UI return `unavailable` with no answer. Pi reports a question-blocked state while waiting. Keep questions and context concise: long text is bounded on screen.
+
+## Per-turn token usage
+
+Tool boxes show `shared turn: ↑1.2k ↓320 R4.0k W200`. These are the provider-reported counts from the assistant turn that called the tool—not the token cost of executing that individual tool. Sibling/parallel calls intentionally show the same turn counts; do not add these labels together. The normal session totals remain unchanged.
+
+`tool model: ↑20 ↓8` appears separately when a tool result reports model usage (including any nested usage aggregated by Pi). Ordinary read/edit/bash tools do not call a model and have no separate billed usage to display. Missing values show `—`; reported zeros remain zero. `↑` is the reported uncached input field, `↓` output, `R` cache reads, and `W` cache writes. No tool argument/result token estimates are invented. Tool-box input counts use the theme accent, output counts use success green, cache counts/labels are muted, and unavailable counts are dim. These colors do not change border status colors; the footer remains muted.
+
+The footer's `turn:` status shows the latest model turn, including text-only turns. Usage restores from the active session branch on resume/tree navigation. Nested calls inherit their parent's shared turn; individual nested tool usage that Pi does not persist separately cannot be reconstructed. Wide tool boxes place counts at bottom-right; narrow boxes wrap them above the bottom border. Tools that retain their own self-rendered UI are not decorated.
+
+Use `/ui set tokenUsage false` to hide these labels and the latest-turn status.
 
 ## Configure
 

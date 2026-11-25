@@ -6,6 +6,8 @@ The node suite covers state restoration and legacy compatibility, input reset, a
 
 The reported duplicated assistant sentence occurs only on screen (saved content contains it once). Fullscreen settled redraw and `/ui redraw` are tested for lifecycle/operation and no message mutation. The original duplicate-row screen artifact has not been reproduced end-to-end; its resolution remains visually unverified.
 
+Token usage tests cover provider fields, missing/zero values, cache separation, shared parallel calls, nested live calls, active-branch restoration, no per-render session scans, and responsive border labels. A real Pi PTY fixture resumes two sibling tool calls and checks shared usage plus separate tool-model usage without contacting a provider. Live-provider accounting has not been independently audited.
+
 Manual release checklist (not yet verified):
 - Compare light/dark theme colors and change theme with existing tool history visible.
 - Resize a long transcript with real images and large expanded diffs in regular/fullscreen modes.
