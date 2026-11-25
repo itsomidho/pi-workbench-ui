@@ -34,6 +34,8 @@ See [QA.md](../QA.md) for unverified/manual coverage: real session restart/resum
 - `index.ts`: extension, UI components, tool presentation and session state.
 - `ask.ts`, `ask-test.mjs`, `ask-terminal-test.py`: Ask component/tool and keyboard/runtime tests.
 - `settings.ts`: validated persistent settings.
+- `task-usage.ts`, `task-dashboard.ts`, task usage/dashboard unit and RPC/PTY tests: branch-scoped accounting, run-ledger provenance, private export and interactive snapshot dashboard.
+- `todo-terminal-test.py`: real four-item viewport scrolling and editor isolation.
 - `token-usage.ts`, `token-usage-test.mjs`, `token-usage-terminal-test.py`: usage provenance index, parallel/restoration/render tests, and a real Pi on-disk resume fixture without model requests.
 - `prompt-borders.ts`, `prompt-borders-test.mjs`: message decoration, native rendering and lifecycle regressions.
 - `test.mjs`: regression and performance suite.

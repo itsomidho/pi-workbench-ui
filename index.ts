@@ -6,11 +6,29 @@ import { defaults, loadSettings, saveSetting, settingsPath } from './settings.ts
 import { registerAsk } from './ask.ts';
 import { registerPromptBorders } from './prompt-borders.ts';
 import { registerTokenUsage } from './token-usage.ts';
+import { registerTaskUsage } from './task-usage.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
 const empty = (): Plan => ({ title: 'Tasks', items: [] });
 const clean = (s: string) => s.replace(/[\x00-\x1f\x7f-\x9f]/g, ' ');
+// Presentation-only state: scrolling never changes the durable TODO plan.
+export class TodoViewport {
+  readonly size = 4;
+  private manualStart?: number;
+  get following() { return this.manualStart === undefined; }
+  reset() { this.manualStart = undefined; }
+  start(items: readonly Item[]) {
+    const active = items.findIndex(item => item.status === 'in_progress');
+    const start = Math.max(0, Math.min(Math.max(0, items.length - this.size), this.manualStart ?? Math.max(0, active - 2)));
+    if (this.manualStart !== undefined) this.manualStart = start;
+    return start;
+  }
+  scroll(delta: number, items: readonly Item[]) {
+    if (items.length <= this.size) return;
+    this.manualStart = Math.max(0, Math.min(items.length - this.size, this.start(items) + delta));
+  }
+}
 // Native renderers can leave a diff background active at a wrapped line end.
 // Reset all SGR attributes before painting padding or another component.
 const closeStyles = (text: string) => text.includes('\x1b[') ? text + '\x1b[0m' : text;
@@ -142,6 +160,7 @@ export default function (pi: ExtensionAPI) {
   try { settings = loadSettings(); } catch (error: any) { settings.enabled = false; settingsError = error.message; }
   registerAsk(pi, () => settings.enabled, () => settings.padding);
   registerPromptBorders(pi, () => settings);
+  registerTaskUsage(pi, () => settings.enabled);
   let activeUI: TUI | undefined;
   const tokenUsage = registerTokenUsage(pi, () => settings.enabled && settings.tokenUsage, () => activeUI?.requestRender());
   const pendingTitles = new Map<string, string>();
@@ -188,26 +207,26 @@ export default function (pi: ExtensionAPI) {
   });
   let plan = empty();
   let visible = true;
+  const todoViewport = new TodoViewport();
   const refresh = (ctx: ExtensionContext) => {
     if (ctx.mode !== 'tui') return;
     ctx.ui.setWidget('todos', settings.enabled && settings.todos && visible ? (_tui, theme) => ({
       invalidate() {},
       render(width: number) {
         const done = plan.items.filter(i => i.status === 'completed').length;
-        const active = plan.items.findIndex(i => i.status === 'in_progress');
-        const start = Math.max(0, active - 2);
-        const shown = plan.items.slice(start, start + 7);
+        const start = todoViewport.start(plan.items);
+        const shown = plan.items.slice(start, start + todoViewport.size);
         return ['', theme.fg('accent', `TODO · ${clean(plan.title)} · ${done}/${plan.items.length}`),
-          ...(start ? [theme.fg('dim', `  … ${start} earlier`)] : []),
           ...(shown.length ? shown.map(i => theme.fg(i.status === 'in_progress' ? 'accent' : i.status === 'completed' ? 'success' : 'dim',
             `  ${i.status === 'completed' ? '✓' : i.status === 'in_progress' ? '▸' : '□'}  ${clean(i.text)}`)) : [theme.fg('dim', '  No tasks yet · use /think to discuss and plan your task')]),
-          ...(start + shown.length < plan.items.length ? [theme.fg('dim', '  … /todos all for full list')] : []),
+          ...(plan.items.length > todoViewport.size ? [theme.fg('dim', `  ${start + 1}–${start + shown.length} of ${plan.items.length} · Ctrl+Alt+↑/↓ · ${todoViewport.following ? 'following' : '/todos follow'}`)] : []),
           '',
         ].map(line => gutterLine(line, width, settings.padding));
       },
     }) : undefined);
   };
   const restore = (ctx: ExtensionContext) => {
+    todoViewport.reset();
     plan = empty();
     titles.clear(); pendingTitles.clear();
     for (const e of ctx.sessionManager.getBranch()) {
@@ -223,6 +242,7 @@ export default function (pi: ExtensionAPI) {
     if (event.source === 'extension' || (!event.text.trim() && !event.images?.length) || isCommand) return;
     if (plan.items.length === 0 || !plan.items.every(item => item.status === 'completed')) return;
     plan = empty();
+    todoViewport.reset();
     pi.appendEntry('workbench-plan', plan);
     refresh(ctx);
   });
@@ -236,6 +256,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params, signal, _update, ctx) {
       if (signal?.aborted) throw new Error('Cancelled');
       if (!validPlan(params)) throw new Error('Invalid plan: at most one active step is allowed');
+      if (plan.title !== params.title || !params.items.length) todoViewport.reset();
       plan = structuredClone(params);
       // Custom entries also persist when invoked from codemode (nested tool
       // results are not separate transcript entries).
@@ -244,12 +265,30 @@ export default function (pi: ExtensionAPI) {
       return { content: [{ type: 'text', text: `${plan.title}: ${plan.items.filter(i => i.status === 'completed').length}/${plan.items.length} completed` }], details: structuredClone(plan) };
     },
   });
+  const scrollTodos = (delta: number, ctx: ExtensionContext) => {
+    todoViewport.scroll(delta, plan.items);
+    refresh(ctx);
+  };
+  for (const [key, delta] of [['ctrl+alt+up', -1], ['ctrl+alt+down', 1]] as const) {
+    pi.registerShortcut(key, {
+      description: `Scroll TODO panel ${delta < 0 ? 'up' : 'down'}`,
+      handler: async ctx => {
+        if (ctx.mode === 'tui' && settings.enabled && settings.todos && visible) scrollTodos(delta, ctx);
+      },
+    });
+  }
   pi.registerCommand('todos', {
-    description: 'Toggle TODO panel; use all to show the full plan',
+    description: 'Toggle TODO panel | all | up | down | follow',
     handler: async (args, ctx) => {
-      if (args.trim() === 'all') {
+      const action = args.trim();
+      if (action === 'all') {
         ctx.ui.notify(plan.items.map(i => `[${i.status}] ${i.text}`).join('\n') || 'No tasks', 'info');
-      } else { visible = !visible; refresh(ctx); }
+      } else if (['up', 'down', 'follow'].includes(action)) {
+        visible = true;
+        if (action === 'follow') { todoViewport.reset(); refresh(ctx); }
+        else scrollTodos(action === 'up' ? -1 : 1, ctx);
+      } else if (!action) { visible = !visible; refresh(ctx); }
+      else ctx.ui.notify('Usage: /todos [all|up|down|follow]', 'info');
     },
   });
   pi.on('session_tree', (_event, ctx) => restore(ctx));

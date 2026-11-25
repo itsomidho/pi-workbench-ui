@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { resolvePiRoot } from './test-support.mjs';
+const root = resolvePiRoot(), require = createRequire(root + '/package.json');
+const jiti = require('jiti').createJiti(import.meta.url, { alias: { '@earendil-works/pi-coding-agent': root + '/dist/index.js', '@earendil-works/pi-tui': require.resolve('@earendil-works/pi-tui') } });
+const { TaskDashboard, elapsed } = await jiti.import('./task-dashboard.ts');
+const { visibleWidth } = await import(require.resolve('@earendil-works/pi-tui'));
+const report = { schemaVersion: 1, source: 'session active branch', task: 'Build 日本語', id: 'task-one', status: 'active', startedAt: '2026-01-01', finishedAt: null, elapsedMs: 1995800, turns: 20, toolCalls: 18, totals: { input: 100, output: 100, cacheRead: 0, cacheWrite: 0, cost: .255594 }, byModel: [{ provider: 'provider', model: 'model', turns: 20, totals: { input: 100, output: 100, cacheRead: 0, cacheWrite: 0, cost: .255594 } }], warnings: [] };
+const painted = new Set();
+const theme = { fg: (color, text) => { painted.add(color); return text; } };
+const keys = { matches: (data, action) => data === action };
+let renders = 0, closed = 0;
+const tui = { terminal: { rows: 40 }, requestRender: () => renders++ };
+const box = new TaskDashboard(report, tui, theme, keys, () => closed++);
+let output = box.render(100).join('\n');
+assert.match(output, /ACTIVE.*33m 15s.*snapshot/);
+assert.match(output, /\$0\.255594/); assert.match(output, /50\.0%/);
+assert.match(output, /not task progress/); assert.match(output, /provider\/model/);
+assert.equal(box.render(100), box.render(100));
+assert.ok(painted.has('accent') && painted.has('success') && painted.has('muted'));
+assert.doesNotMatch(output, /task-one|2026-01-01/);
+box.handleInput('d'); output = box.render(100).join('\n');
+assert.match(output, /ID: task-one/); assert.match(output, /not finished/); assert.match(output, /independently audited/);
+box.handleInput('d');
+for (const width of [0, 1, 2, 4, 10, 20, 40, 80, 120]) {
+ for (const height of [1, 4, 10, 24, 40]) {
+  tui.terminal.rows = height;
+  const lines = box.render(width);
+  assert.ok(lines.length <= Math.max(1, Math.floor(height * .8)));
+  for (const line of lines) assert.ok(visibleWidth(line) <= width, 'width ' + width);
+ }
+}
+tui.terminal.rows = 20;
+box.render(40); box.handleInput('end'); output = box.render(40).join('\n');
+assert.match(output, /provider\/model|Cache read/);
+box.handleInput('home'); assert.match(box.render(40).join('\n'), /Reported cost/);
+box.handleInput('tui.select.pageDown'); assert.doesNotMatch(box.render(40).join('\n'), /Reported cost/);
+box.handleInput('tui.select.pageUp'); assert.match(box.render(40).join('\n'), /Reported cost/);
+const incomplete = new TaskDashboard({ ...report, totals: { ...report.totals, output: null }, warnings: ['Incomplete recorded fields: output; totals are partial.'] }, { ...tui, terminal: { rows: 50 } }, theme, keys, () => {});
+output = incomplete.render(100).join('\n');
+assert.match(output, /unknown/); assert.doesNotMatch(output, /50\.0%/); assert.match(output, /bars unavailable/);
+const zero = new TaskDashboard({ ...report, totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 } }, { ...tui, terminal: { rows: 50 } }, theme, keys, () => {});
+assert.match(zero.render(100).join('\n'), /shares are undefined/);
+assert.doesNotMatch(zero.render(100).join('\n'), /NaN|Infinity/);
+assert.equal(elapsed(null), 'unknown time'); assert.equal(elapsed(3600000), '1h 0m');
+box.handleInput('\x1b'); box.handleInput('q'); assert.equal(closed, 1);
+assert.ok(renders > 0);
+// The command opens an interactive overlay only in enabled TUI mode.
+const { registerTaskUsage } = await jiti.import('./task-usage.ts');
+let command, opened = 0, notified = 0;
+const entries = [{ type: 'custom', customType: 'workbench-task-usage', data: { action: 'start', id: 'one', name: 'Sample', at: '2026-01-01' } }];
+const pi = { registerCommand: (_name, def) => command = def };
+registerTaskUsage(pi);
+const ctx = { mode: 'tui', sessionManager: { getBranch: () => entries }, ui: { notify: () => notified++, custom: async (factory, options) => { assert.equal(options.overlay, true); opened++; const component = factory(tui, theme, keys, () => {}); component.handleInput('q'); } } };
+await command.handler('show', ctx); assert.equal(opened, 1); assert.equal(notified, 0);
+await command.handler('show', { ...ctx, mode: 'rpc' }); assert.equal(opened, 1); assert.equal(notified, 1);
+registerTaskUsage(pi, () => false); await command.handler('show', ctx); assert.equal(opened, 1); assert.equal(notified, 2);
+console.log('PASS: dashboard status/colors, exact values, usage-only bars, unknown/zero data, details, scrolling, Unicode resize and TUI-only routing');

@@ -30,12 +30,14 @@ exit "${FAIL_PI:-0}"
         path = self.bin / name
         path.write_text(content)
         path.chmod(0o755)
-    def make_archive(self, name='pi-workbench-ui', version='0.7.0', missing_prompt=False, missing_tokens=False):
-        files = {'package.json': json.dumps({'name': name, 'version': version, 'pi': {'extensions': ['./index.ts']}}), 'index.ts': '// test', 'settings.ts': '// test', 'ask.ts': '// test', 'prompt-borders.ts': '// test', 'token-usage.ts': '// test'}
+    def make_archive(self, name='pi-workbench-ui', version='0.8.0', missing_prompt=False, missing_tokens=False, missing_task=None):
+        files = {'package.json': json.dumps({'name': name, 'version': version, 'pi': {'extensions': ['./index.ts']}}), 'index.ts': '// test', 'settings.ts': '// test', 'ask.ts': '// test', 'prompt-borders.ts': '// test', 'token-usage.ts': '// test', 'task-usage.ts': '// test', 'task-dashboard.ts': '// test'}
         if missing_prompt:
             files.pop('prompt-borders.ts')
         if missing_tokens:
             files.pop('token-usage.ts')
+        if missing_task:
+            files.pop(missing_task)
         with tarfile.open(self.archive, 'w:gz') as archive:
             for name, value in files.items():
                 data = value.encode()
@@ -53,7 +55,7 @@ exit "${FAIL_PI:-0}"
         self.assertTrue((self.dest / 'index.ts').is_file())
         self.assertFalse((self.dest / '.git').exists())
         self.assertIn('pi install ' + str(self.dest), self.log.read_text())
-        self.assertIn('/v0.7.0.tar.gz', self.log.read_text())
+        self.assertIn('/v0.8.0.tar.gz', self.log.read_text())
     def test_skip_registration(self):
         self.run_install('--no-register')
         self.assertNotIn('pi install', self.log.read_text())
@@ -83,7 +85,7 @@ exit "${FAIL_PI:-0}"
         self.run_install(success=False)
         self.assertFalse(self.dest.exists())
     def test_wrong_package_or_version(self):
-        for name, version in [('other', '0.7.0'), ('pi-workbench-ui', '9.9.9')]:
+        for name, version in [('other', '0.8.0'), ('pi-workbench-ui', '9.9.9')]:
             self.make_archive(name, version)
             self.run_install(success=False)
             self.assertFalse(self.dest.exists())
@@ -104,13 +106,13 @@ exit "${FAIL_PI:-0}"
     def test_upgrade_preserves_old_tree_and_skips_registration(self):
         self.seed_install()
         self.run_install(env={'FAIL_PI': '1'})
-        self.assertEqual(json.loads((self.dest / 'package.json').read_text())['version'], '0.7.0')
+        self.assertEqual(json.loads((self.dest / 'package.json').read_text())['version'], '0.8.0')
         self.assertTrue((self.dest / 'prompt-borders.ts').is_file())
         backup, = self.root.glob('installed.backup.*')
         self.assertEqual((backup / 'previous/local-note').read_text(), 'preserve me')
         self.assertNotIn('pi install', self.log.read_text())
     def test_current_version_is_unchanged(self):
-        self.seed_install('0.7.0')
+        self.seed_install('0.8.0')
         self.assertIn('already up to date', self.run_install().stdout)
         self.assertFalse(self.log.exists())
         self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')
@@ -147,6 +149,22 @@ exec "$REAL_MV" "$@"
         self.make_archive(version='0.6.0', missing_tokens=True)
         self.run_install('--version', 'v0.6.0')
         self.assertTrue((self.dest / 'index.ts').is_file())
+    def test_missing_task_modules_rejected(self):
+        for module in ['task-usage.ts', 'task-dashboard.ts']:
+            with self.subTest(module=module):
+                self.make_archive(missing_task=module)
+                self.run_install(success=False)
+                self.assertFalse(self.dest.exists())
+    def test_previous_release_without_task_modules(self):
+        self.make_archive(version='0.7.0', missing_task='task-dashboard.ts')
+        self.run_install('--version', 'v0.7.0')
+        self.assertTrue((self.dest / 'index.ts').is_file())
+    def test_bad_task_upgrade_preserves_install(self):
+        self.seed_install('0.7.0')
+        self.make_archive(missing_task='task-usage.ts')
+        self.run_install(success=False)
+        self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')
+        self.assertFalse(list(self.root.glob('installed.backup.*')))
     def test_registration_failure_preserves_files(self):
         result = self.run_install(success=False, env={'FAIL_PI': '1'})
         self.assertTrue((self.dest / 'index.ts').is_file())

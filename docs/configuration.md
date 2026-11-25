@@ -30,4 +30,4 @@ Collapsed previews apply an additional line limit after native rendering. Expand
 
 The footer uses cumulative session statistics, including recorded compaction/summary/nested-tool usage. Routing metadata comes from the active branch's latest assistant message; missing metadata is displayed as unknown.
 
-TODO and explicit tool-title history live in the Pi session. Visibility toggled with `/todos` is session-local; use `/ui set todos false` for a persistent preference.
+TODO and explicit tool-title history live in the Pi session. Visibility toggled with `/todos` is session-local; use `/ui set todos false` for a persistent preference. The viewport shows four items, with Ctrl+Alt+Up/Down or `/todos up|down` for longer plans. Manual browsing pauses active-item follow until `/todos follow`. Scroll offsets are presentation-only: status updates retain them (clamped to list length), while new plan titles, empty plans, session reload/resume and tree navigation reset follow mode. No task status is changed by scrolling.

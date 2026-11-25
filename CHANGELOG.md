@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+- Replace interactive task usage Markdown notifications with a responsive dashboard: status bar, highlighted cost, recorded-token share bars, model breakdowns and scrollable details; keep exports and non-TUI output unchanged.
+
+- Limit the TODO panel to four items with keyboard/command scrolling and explicit auto-follow recovery; fix hidden first items in short plans.
+
+- Add named session task usage with explicit boundaries, model breakdowns, unknown/partial metadata, and private JSON/Markdown exports.
+- Read an explicit Workbench run ledger as a separate source without merging counts.
+
 ## 0.7.0
 
 - Add provider-reported shared-turn usage to tool boxes and latest-turn footer status; keep any tool-reported model usage separate.

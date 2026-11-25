@@ -14,12 +14,12 @@ const jiti = createJiti(import.meta.url, { alias: {
   '@earendil-works/pi-tui': require.resolve('@earendil-works/pi-tui'),
   'typebox': require.resolve('typebox'),
 } });
-const { default: extension, frame, validPlan, gutterLine, footerStats, toolTitle, preview } = await jiti.import('./index.ts');
+const { default: extension, frame, validPlan, gutterLine, footerStats, toolTitle, preview, TodoViewport } = await jiti.import('./index.ts');
 const { visibleWidth, Text, CURSOR_MARKER } = await import(require.resolve('@earendil-works/pi-tui'));
-const events = {}, commands = {}, entries = [], tools = [], notifications = [];
+const events = {}, commands = {}, shortcuts = {}, entries = [], tools = [], notifications = [];
 let resolver, widget, footerFactory, editorFactory;
 const pi = {
- on(name, fn) { events[name] = fn; }, registerCommand(name, def) { commands[name] = def; },
+ on(name, fn) { events[name] = fn; }, registerCommand(name, def) { commands[name] = def; }, registerShortcut(key, def) { shortcuts[key] = def; },
  registerTool(def) { if (def.name === 'todo_plan') tools.unshift(def); else tools.push(def); }, registerToolRenderer(fn) { resolver = fn; },
  appendEntry(customType, data) { entries.push({ type: 'custom', customType, data: structuredClone(data) }); },
  getThinkingLevel() { return 'high'; },
@@ -66,7 +66,55 @@ assert.ok(widget);
 const long = { title: 'Long plan', items: Array.from({ length: 15 }, (_, i) => ({ text: `Step ${i}`, status: i === 12 ? 'in_progress' : 'pending' })) };
 await tools[0].execute('long', long, undefined, undefined, ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /▸  Step 12/);
-assert.match(widget(tui, theme).render(80).join('\n'), /earlier/);
+assert.match(widget(tui, theme).render(80).join('\n'), /11–14 of 15/);
+// Four items never hide the first item, including when the fourth is active.
+const four = { title: 'Four', items: Array.from({ length: 4 }, (_, i) => ({ text: `Row ${i}`, status: i === 3 ? 'in_progress' : 'completed' })) };
+await tools[0].execute('four', four, undefined, undefined, ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /Row 0/);
+assert.equal(widget(tui, theme).render(80).filter(line => /Row \d/.test(line)).length, 4);
+assert.doesNotMatch(widget(tui, theme).render(80).join('\n'), /of 4|Ctrl\+Alt/);
+// Dedicated shortcuts and commands scroll without appending plan entries.
+await tools[0].execute('long-again', long, undefined, undefined, ctx);
+const scrollEntries = entries.length;
+await shortcuts['ctrl+alt+up'].handler(ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /10–13 of 15/);
+assert.match(widget(tui, theme).render(80).join('\n'), /\/todos follow/);
+const advanced = { ...long, items: long.items.map((item, i) => ({ ...item, status: i === 14 ? 'in_progress' : 'pending' })) };
+await tools[0].execute('advance', advanced, undefined, undefined, ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /10–13 of 15/);
+await commands.todos.handler('down', ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /11–14 of 15/);
+await shortcuts['ctrl+alt+down'].handler(ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /12–15 of 15/);
+await shortcuts['ctrl+alt+down'].handler(ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /12–15 of 15/);
+assert.equal(entries.length, scrollEntries + 1);
+await commands.todos.handler('follow', ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /following/);
+await commands.todos.handler('up', ctx);
+await events.session_tree({}, ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /12–15 of 15.*following/);
+await commands.todos.handler('typo', ctx);
+assert.match(notifications.at(-1), /Usage:/);
+assert.ok(widget);
+// Hidden panels ignore scroll shortcuts; commands make the panel visible.
+await commands.todos.handler('', ctx);
+await shortcuts['ctrl+alt+up'].handler(ctx);
+assert.equal(widget, undefined);
+await commands.todos.handler('up', ctx);
+assert.ok(widget);
+assert.match(widget(tui, theme).render(80).join('\n'), /11–14 of 15/);
+const viewport = new TodoViewport();
+assert.equal(viewport.start([]), 0);
+const fifty = Array.from({ length: 50 }, (_, i) => ({ text: `Item ${i}`, status: i === 49 ? 'in_progress' : 'pending' }));
+assert.equal(viewport.start(fifty), 46);
+viewport.scroll(-100, fifty); assert.equal(viewport.start(fifty), 0);
+viewport.scroll(100, fifty); assert.equal(viewport.start(fifty), 46);
+assert.equal(viewport.start(fifty.slice(0, 5)), 1);
+assert.equal(viewport.start(fifty), 1); // Shrink clamps the manual offset, not just the rendered position.
+viewport.reset(); assert.equal(viewport.start(fifty), 46);
+for (const width of [0, 1, 2, 10, 40, 80]) for (const line of widget(tui, theme).render(width)) assert.ok(visibleWidth(line) <= width);
+console.log('PASS: four-item TODO viewport, scrolling boundaries, paused/follow mode, tree restoration and separate shortcuts');
 await tools[0].execute('reset', plan, undefined, undefined, ctx);
 for (const width of [1, 2, 3, 4, 10, 40, 80]) {
  const component = frame(new Text('日本語 wide text\nsecond', 0, 0), 'done · 1.20s', 'bottom', s => s);

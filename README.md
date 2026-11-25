@@ -32,7 +32,7 @@ Extensions execute with your user permissions. Review code before installation.
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-This downloads the tagged **v0.7.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+This downloads the tagged **v0.8.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
 
 Alternatively, let Pi manage a Git package:
 
@@ -71,6 +71,8 @@ If the checkout has local changes or cannot fast-forward, resolve them before up
 | --- | --- |
 | `/todos` | Toggle the TODO panel for this session |
 | `/todos all` | Show all tasks |
+| `/todos up` / `/todos down` | Scroll the four-item TODO viewport |
+| `/todos follow` | Resume automatically following the active item |
 | `/ui settings` | Show configuration and its file path |
 | `/ui set <key> <value>` | Save a setting and reload |
 | `/ui reset` | Disable custom UI and reload |
@@ -78,6 +80,8 @@ If the checkout has local changes or cannot fast-forward, resolve them before up
 | `/ui enable` | Restore custom UI using saved settings |
 
 For multi-step work, ask Pi to maintain the task panel. The `todo_plan` tool replaces the full plan; at most one task can be active. Completed tasks remain until the next user prompt. Unfinished tasks survive follow-ups. Commands and internal extension follow-ups do not reset them.
+
+The panel shows at most four items. Longer plans show a range such as `2–5 of 9`. Scroll one item with **Ctrl+Alt+↑ / Ctrl+Alt+↓**, or use `/todos up` and `/todos down` if your terminal intercepts these shortcuts. Manual scrolling pauses auto-follow until `/todos follow`; ordinary arrow keys remain editor/history keys. Status updates preserve the browsed position, while a new plan title, session reload or branch navigation restores auto-follow. `/todos all` still shows the full list.
 
 The empty-panel hint suggests `/think`, which is provided by Pi Workbench—not this package. Without Workbench, ask Pi directly to create a plan.
 
@@ -98,6 +102,32 @@ Tool boxes show `shared turn: ↑1.2k ↓320 R4.0k W200`. These are the provider
 The footer's `turn:` status shows the latest model turn, including text-only turns. Usage restores from the active session branch on resume/tree navigation. Nested calls inherit their parent's shared turn; individual nested tool usage that Pi does not persist separately cannot be reconstructed. Wide tool boxes place counts at bottom-right; narrow boxes wrap them above the bottom border. Tools that retain their own self-rendered UI are not decorated.
 
 Use `/ui set tokenUsage false` to hide these labels and the latest-turn status.
+
+## Task usage reports
+
+Track a named task across multiple prompts in a saved Pi session:
+
+```text
+/task-usage start Build the settings screen
+/task-usage show
+/task-usage finish
+/task-usage export
+```
+
+In the interactive terminal, `show` opens a styled dashboard with a status bar, highlighted reported cost, exact token counts, usage-share bars and model breakdowns. Press **d** for Details/Overview, **↑↓** or **PageUp/PageDown** to scroll, and **Esc** (or **q**) to close. This is a snapshot at opening; reopen to refresh. The bars show the share of recorded tokens, **not task progress**; incomplete token fields disable share bars. Data notes remain flagged in the header. RPC/print mode and disabled custom UI keep the plain-text report. JSON/Markdown exports are unchanged.
+
+`show` and `export` use the most recently started task on the active branch. Only one task can be active per branch. Boundaries are explicit session entries, so reload/resume and tree navigation retain their scope. Exports produce private JSON and Markdown files under `~/.local/state/pi-workbench-ui/usage-reports` (or `XDG_STATE_HOME`). Nothing is uploaded. Reports include input/output/cache counts, reported cost, physical model breakdown, turns, tool calls and elapsed wall time. Local task timing includes idle time.
+
+Usage comes from each recorded assistant, top-level tool-result, usage, compaction and summary entry—not from tool-box shared labels or nested-call summaries. Tool-result usage lacking physical model attribution appears as unknown rather than being guessed. Missing fields remain unknown or partial. These are recorded usage reports, not billing audits.
+
+For a managed Workbench task, read its existing run ledger separately:
+
+```text
+/task-usage workbench /absolute/path/to/task-directory exact-run-id
+/task-usage workbench /absolute/path/to/task-directory exact-run-id export
+```
+
+The task must be inside `PI_TASKS_DIR` or the default Workbench task workspace. Run IDs are explicit, and Workbench totals never merge into session totals. This ledger currently contains assistant responses only, so other usage, tool-call counts and elapsed task time may be unavailable. Rows lack event IDs; the report warns that duplicate ledger records cannot be independently identified. Task/model names may contain private information—review exports before sharing.
 
 ## Configure
 
