@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Give the task usage dashboard more breathing room, an aligned token chart with muted end caps, and a summary that stacks on narrow terminals.
+- Restore saved prompt history for Up/Down navigation when Workbench recreates the editor after `/reload`.
+
 ## 0.8.0
 
 - Replace interactive task usage Markdown notifications with a responsive dashboard: status bar, highlighted cost, recorded-token share bars, model breakdowns and scrollable details; keep exports and non-TUI output unchanged.

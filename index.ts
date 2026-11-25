@@ -320,7 +320,16 @@ export default function (pi: ExtensionAPI) {
             return lines;
           }
         }
-        return new WorkbenchEditor(tui, theme, keys, { paddingX: settings.padding, embedWorkingStatus: true });
+        const editor = new WorkbenchEditor(tui, theme, keys, { paddingX: settings.padding, embedWorkingStatus: true });
+        // On reload Pi transfers the draft, but doesn't seed the replacement
+        // editor's history. Use the same session projection as native resume.
+        // Pi's addToHistory de-duplicates when startup also populates history.
+        for (const entry of ctx.sessionManager.buildContextEntries()) {
+          if (entry.type !== 'message' || entry.message.role !== 'user') continue;
+          const { content } = entry.message;
+          editor.addToHistory(typeof content === 'string' ? content : content.filter(block => block.type === 'text').map(block => block.text).join(''));
+        }
+        return editor;
       });
     }
     ctx.ui.setFooter((tui, theme, data) => {

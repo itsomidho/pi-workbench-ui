@@ -27,7 +27,7 @@ const pi = {
 extension(pi);
 const theme = { fg: (_color, s) => s };
 const ctx = { mode: 'tui', cwd: '/tmp/test', model: { id: 'test' },
- sessionManager: { getBranch: () => entries, getEntries: () => entries, getSessionName: () => 'UI session', getLeafId: () => String(entries.length) },
+ sessionManager: { getBranch: () => entries, getEntries: () => entries, buildContextEntries: () => entries, getSessionName: () => 'UI session', getLeafId: () => String(entries.length) },
  getContextUsage: () => ({ percent: 10 }),
  ui: { theme, setWidget: (_key, factory) => { widget = factory; }, getEditorComponent: () => undefined,
  setEditorComponent: f => { editorFactory = f; }, setFooter: f => { footerFactory = f; }, notify(text) { notifications.push(text); } },

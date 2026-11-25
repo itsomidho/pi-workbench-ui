@@ -44,7 +44,10 @@ export class TaskDashboard {
     this.cacheKey = key;
     if (width <= 0) return this.cache = [''];
     const th = this.theme, r = this.report;
-    const inner = Math.max(1, width - 4);
+    const inset = width >= 32 ? 2 : 1;
+    const inner = Math.max(1, width - 2 - inset * 2);
+    const spacious = height >= 18;
+    const gap = ' '.repeat(inset);
     const rows: string[] = [];
     const line = (text: string, color: Parameters<Theme['fg']>[0] = 'muted') => {
       for (const part of wrapTextWithAnsi(safe(text), inner)) rows.push(th.fg(color, part));
@@ -63,8 +66,15 @@ export class TaskDashboard {
       line('Export JSON/Markdown with /task-usage export (or the Workbench command with export).');
     } else {
       const partialCost = r.warnings.some(w => w.startsWith('Incomplete recorded fields:') && w.split(';')[0].includes('cost'));
-      line(`Reported cost${partialCost ? ' (partial)' : ''}  ${money(r.totals.cost)}`, 'accent');
-      line(`Model turns ${number(r.turns)} · Tool calls ${number(r.toolCalls)}`);
+      const cost = `Reported cost${partialCost ? ' (partial)' : ''}  ${money(r.totals.cost)}`;
+      const activity = [`Model turns ${number(r.turns)}`, `Tool calls ${number(r.toolCalls)}`];
+      const summary = [cost, ...activity].join('   ·   ');
+      if (visibleWidth(summary) <= inner) {
+        rows.push(th.fg('accent', cost) + th.fg('muted', `   ·   ${activity.join('   ·   ')}`));
+      } else {
+        line(cost, 'accent');
+        for (const metric of activity) line(metric);
+      }
       if (r.warnings.length) line(`${r.warnings.length} data notes · d for details (totals may be partial)`, 'warning');
       line('');
       const tokenKeys = ['input', 'output', 'cacheRead', 'cacheWrite'] as const;
@@ -73,38 +83,47 @@ export class TaskDashboard {
       line(complete ? 'Recorded token mix · not task progress' : 'Token counts · incomplete data', 'accent');
       const labels = ['Input', 'Output', 'Cache read', 'Cache write'];
       const colors = ['accent', 'success', 'muted', 'dim'] as const;
+      const counts = tokenKeys.map(key => number(r.totals[key]));
+      const countWidth = Math.max(...counts.map(count => count.length));
+      const chartWidth = inner - (12 + 2 + countWidth + 2 + 2 + 6);
+      const grid = inner >= 52 && chartWidth >= 8;
+      const capped = grid ? chartWidth >= 10 : inner >= 24;
+      const cap = capped ? th.fg('borderMuted', '│') : '';
+      const barSize = grid ? Math.min(32, chartWidth - (capped ? 2 : 0)) : Math.max(0, Math.min(24, inner - (capped ? 12 : 10)));
       tokenKeys.forEach((key, i) => {
         const value = r.totals[key];
         const share = complete && sum > 0 && value !== null ? value / sum : undefined;
-        const percent = share === undefined ? '' : ` ${(share * 100).toFixed(1)}%`;
-        const barSize = inner >= 66 ? 18 : Math.max(0, Math.min(24, inner - 10));
+        const percent = share === undefined ? '' : `${(share * 100).toFixed(1)}%`;
         const filled = share === undefined ? 0 : Math.round(share * barSize);
-        const bar = share === undefined ? '—' : '█'.repeat(filled) + '░'.repeat(barSize - filled);
-        if (inner >= 66) {
-          rows.push(th.fg(colors[i], `${labels[i].padEnd(12)} ${number(value).padStart(18)}  ${bar}${percent}`));
+        const bar = share === undefined || barSize < 4 ? '' : cap + th.fg(colors[i], '█'.repeat(filled) + '░'.repeat(barSize - filled)) + cap;
+        if (grid) {
+          const metric = `${labels[i].padEnd(12)}  ${counts[i].padStart(countWidth)}`;
+          rows.push(th.fg(colors[i], metric) + (bar ? `  ${bar}  ${th.fg('muted', percent.padStart(6))}` : ''));
         } else {
-          line(`${labels[i]}  ${number(value)}`, colors[i]);
-          if (barSize >= 4 && share !== undefined) rows.push(th.fg(colors[i], `  ${bar}${percent}`));
+          line(`${labels[i]}  ${counts[i]}`, colors[i]);
+          if (percent) rows.push(`  ${bar ? `${bar}  ` : ''}${th.fg('muted', percent)}`);
         }
       });
       if (!complete) line('Usage-share bars unavailable for incomplete token fields.', 'dim');
       else if (sum === 0) line('No recorded tokens; usage shares are undefined.', 'dim');
       line(''); line('Models', 'accent');
       if (!r.byModel.length) line('No model usage recorded.');
-      for (const model of r.byModel) {
+      for (const [i, model] of r.byModel.entries()) {
+        if (i && spacious) line('');
         line(`${model.provider}/${model.model}`, 'accent');
         line(`  ${number(model.turns)} turns · ${money(model.totals.cost)} reported`);
         line(`  Input ${number(model.totals.input)} · Output ${number(model.totals.output)}`);
         line(`  Cache read ${number(model.totals.cacheRead)} · write ${number(model.totals.cacheWrite)}`);
       }
     }
-    this.pageSize = Math.max(1, height - 5);
+    if (spacious) rows.unshift('');
+    this.pageSize = Math.max(1, height - 4 - Number(spacious));
     this.offset = Math.max(0, Math.min(this.offset, Math.max(0, rows.length - this.pageSize)));
     const controls = `Esc close · d ${this.details ? 'overview' : 'details'} · ${inner < 50 ? '↑↓ scroll' : '↑↓/PgUp/PgDn scroll'}`;
     const status = `${r.status.toUpperCase()}${r.warnings.length ? ` · ${r.warnings.length} notes` : ''} · ${elapsed(r.elapsedMs)} · snapshot`;
     const inside = (text: string) => {
       const fitted = truncateToWidth(text, inner);
-      return th.fg('borderMuted', '│') + ' ' + fitted + ' '.repeat(Math.max(0, inner - visibleWidth(fitted))) + ' ' + th.fg('borderMuted', '│');
+      return th.fg('borderMuted', '│') + gap + fitted + ' '.repeat(Math.max(0, inner - visibleWidth(fitted))) + gap + th.fg('borderMuted', '│');
     };
     const border = (left: string, label: string, right: string) => {
       const title = truncateToWidth(label, Math.max(0, width - 2), '');
@@ -114,7 +133,8 @@ export class TaskDashboard {
     const position = rows.length > this.pageSize ? ` ${this.offset + 1}–${this.offset + window.length}/${rows.length} ` : '';
     const result = [border('╭', `─ Task usage · ${safe(r.task)} `, '╮'),
       inside(th.fg(r.status === 'finished' ? 'success' : r.status === 'active' ? 'accent' : 'muted', status)),
-      ...window.map(inside), inside(th.fg('dim', controls)), border('╰', position, '╯')];
+      ...window.map(inside), ...(spacious ? [inside(th.fg('borderMuted', '─'.repeat(inner)))] : []),
+      inside(th.fg('dim', controls)), border('╰', position, '╯')];
     // Degrade safely on tiny terminals; all navigation remains available.
     return this.cache = (width < 5 || height < 5 ? [status, ...window, controls].slice(0, height) : result).map(row => truncateToWidth(row, width));
   }

@@ -6,7 +6,8 @@ with tempfile.TemporaryDirectory(prefix='workbench-todo-pty-') as directory:
 import { resolvePiRoot } from './test-support.mjs';
 const { SessionManager } = await import(resolvePiRoot() + '/dist/index.js');
 const sm = SessionManager.create(process.cwd(), process.env.FIXTURE_DIR);
-sm.appendMessage({ role: 'user', content: [{ type: 'text', text: 'TODO scroll fixture' }], timestamp: Date.now() });
+sm.appendMessage({ role: 'user', content: [{ type: 'text', text: 'Older saved prompt' }], timestamp: Date.now() });
+sm.appendMessage({ role: 'user', content: [{ type: 'text', text: 'Newest saved prompt' }], timestamp: Date.now() });
 sm.appendCustomEntry('workbench-plan', { title: 'Scroll fixture', items: Array.from({ length: 9 }, (_, i) => ({ text: 'Task ' + (i + 1), status: i === 6 ? 'in_progress' : 'pending' })) });
 console.log(sm.getSessionFile());
 '''
@@ -29,6 +30,15 @@ console.log(sm.getSessionFile());
     try:
         text = drain(4)
         assert '5–8 of 9' in text and 'following' in text, text[-5000:]
+        os.write(master, b'/reload\r'); text = drain(1.5)
+        assert 'Reloaded keybindings' in text, text[-5000:]
+        os.write(master, b'\x1b[A'); text = drain(.6)
+        assert 'Newest saved prompt' in text, text[-5000:]
+        os.write(master, b'\x1b[A'); text = drain(.6)
+        assert 'Older saved prompt' in text, text[-5000:]
+        os.write(master, b'\x1b[B'); text = drain(.6)
+        assert 'Newest saved prompt' in text, text[-5000:]
+        os.write(master, b'\x03'); drain(.5)
         # Xterm modifier 7 = Ctrl+Alt. Plain arrows remain editor/history keys.
         os.write(master, b'\x1b[1;7A'); text = drain(.7)
         assert '4–7 of 9' in text and '/todos follow' in text, text[-5000:]
@@ -40,7 +50,7 @@ console.log(sm.getSessionFile());
         resize(40); process.send_signal(signal.SIGWINCH); text = drain(.7)
         assert 'draft 日本語' in text and '5–8 of 9' in text, text[-5000:]
         assert process.poll() is None and 'TypeError:' not in text
-        print('PASS: real Pi resumed TODO viewport, Ctrl+Alt+arrows, follow command, draft typing and 40-column resize')
+        print('PASS: real Pi prompt history after reload, TODO Ctrl+Alt+arrows, follow command, draft typing and 40-column resize')
     finally:
         process.terminate()
         try: process.wait(timeout=5)
