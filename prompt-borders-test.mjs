@@ -14,7 +14,8 @@ assert.equal(setTheme('dark', false).success, true); stopThemeWatcher();
 const native = UserMessageComponent.prototype.render;
 const events = {};
 let settings = { ...defaults };
-registerPromptBorders({ on: (event, fn) => { events[event] = fn; } }, () => settings);
+let hostPadding = 1;
+registerPromptBorders({ on: (event, fn) => { events[event] = fn; }, getSettings: () => ({ outputPad: hostPadding }) }, () => settings);
 const context = { mode: 'tui', ui: { theme } };
 events.session_start({}, context);
 assert.notStrictEqual(UserMessageComponent.prototype.render, native);
@@ -62,9 +63,8 @@ assert.equal(plain.length - bottomIndex - 1, 0, 'no extra outer row below outlin
 assert.equal(plain[topIndex].indexOf('╭'), 1, 'left border aligns with the shared one-column gutter');
 assert.equal(plain[topIndex].indexOf('╮'), 78, 'right border aligns with other panels');
 assert.equal(plain[textIndex].indexOf('X') - plain[textIndex].indexOf('│') - 1, 2, 'two inner columns');
-// Check actual background state at every ASCII cell, including border glyphs.
-// A horizontal glyph only covers part of its cell, so its background must be
-// blue too; testing only the body padding missed the visible dark rim.
+// Check actual background state: blue belongs only to the interior, never
+// to border cells or outer gutters. Otherwise a blue halo surrounds the line.
 function backgroundCells(line) {
  const cells = [];
  let background = false;
@@ -78,13 +78,70 @@ function backgroundCells(line) {
  }
  return cells;
 }
-for (const line of spacingLines) {
+for (const [row, line] of spacingLines.entries()) {
  const cells = backgroundCells(line);
  assert.equal(cells.length, 80);
  assert.equal(cells[0].background, false, 'left outer gutter must stay unfilled');
  assert.equal(cells.at(-1).background, false, 'right outer gutter must stay unfilled');
- assert.ok(cells.slice(1, -1).every(cell => cell.background), 'message fill must reach every border cell without a dark gap');
+ assert.equal(cells[1].background, false, 'left border must not carry blue background');
+ assert.equal(cells.at(-2).background, false, 'right border must not carry blue background');
+ if (row === 0 || row === spacingLines.length - 1) {
+  assert.ok(cells.every(cell => !cell.background), 'horizontal border must not carry blue background');
+ } else {
+  assert.ok(cells.slice(2, -2).every(cell => cell.background), 'interior must retain original background');
+ }
 }
+settings.promptStyle = 'accent';
+const panel = new UserMessageComponent('Accent preview 日本語');
+for (const width of [10, 40, 80, 120]) {
+ const rows = panel.render(width);
+ assert.ok(rows.every(line => line.includes('▎')));
+ assert.ok(rows.every(line => !/[╭╮╰╯│]/u.test(stripVTControlCharacters(line))));
+ assert.strictEqual(panel.render(width), rows);
+ for (const row of rows) assert.ok(visibleWidth(row) <= width);
+}
+const panelRows = new UserMessageComponent('X').render(80);
+assert.equal(panelRows.length, 3);
+const panelText = panelRows.map(stripVTControlCharacters);
+assert.ok(!panelText[0].includes('You'), 'no separate label row');
+assert.ok(panelText[1].includes('You: X'), 'label and text appear on one line');
+const identityPanel = new UserMessageComponent('Message content');
+const originalIdentityRows = identityPanel.render(80);
+settings.promptLabel = 'Jane Doe';
+const namedRows = identityPanel.render(80);
+assert.notStrictEqual(namedRows, originalIdentityRows);
+assert.ok(stripVTControlCharacters(namedRows[1]).includes('Jane Doe: Message content'));
+assert.equal(namedRows.length, 3, 'inline label must not add a header row');
+settings.promptLabel = '';
+assert.ok(!identityPanel.render(80).join('').includes('Jane Doe'));
+assert.ok(stripVTControlCharacters(identityPanel.render(80)[1]).includes('Message content'));
+settings.promptLabel = '名前'.repeat(20);
+for (const width of [10, 40, 80]) for (const row of identityPanel.render(width)) assert.ok(visibleWidth(row) <= width);
+settings.promptLabel = 'You';
+hostPadding = 0;
+const zeroPadText = new UserMessageComponent('X', undefined, 0).render(80).map(stripVTControlCharacters);
+assert.ok(zeroPadText[1].includes('You: X'));
+const wrapped = new UserMessageComponent(Array(30).fill('word').join(' ')).render(40).map(stripVTControlCharacters);
+const firstWrapped = wrapped.find(line => line.includes('You:'));
+const textStart = firstWrapped.indexOf('word');
+for (const row of wrapped.filter(line => line.includes('word'))) assert.equal(row.indexOf('word'), textStart, 'wrapped prompt text must align');
+assert.equal(wrapped.filter(row => row.includes('You:')).length, 1, 'show the label once');
+hostPadding = 1;
+assert.equal(validateSetting('promptLabel', ''), true);
+assert.equal(validateSetting('promptLabel', 'Jane Doe'), true);
+assert.equal(validateSetting('promptLabel', '\x1b[31mName'), false);
+assert.equal(validateSetting('promptLabel', 'a'.repeat(61)), false);
+for (const line of panelRows) {
+ const cells = backgroundCells(line);
+ assert.equal(cells.length, 80);
+ assert.ok(cells.slice(1, -1).every(cell => cell.background), 'solid panel must be filled, including accent cell');
+ assert.equal(cells[0].background, false);
+ assert.equal(cells.at(-1).background, false);
+}
+assert.ok(panelRows.join('').includes('\x1b]133;A'));
+assert.equal(validateSetting('promptStyle', 'accent'), true);
+assert.equal(validateSetting('promptStyle', 'invalid'), false);
+settings.promptStyle = 'outline';
 const component = new UserMessageComponent('test');
 settings.promptBorders = false;
 assert.ok(!component.render(80).some(line => line.includes('╭')));

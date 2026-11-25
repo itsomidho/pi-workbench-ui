@@ -1,5 +1,5 @@
 import { UserMessageComponent, type ExtensionAPI, type ExtensionContext } from '@earendil-works/pi-coding-agent';
-import { visibleWidth } from '@earendil-works/pi-tui';
+import { visibleWidth, truncateToWidth, sliceByColumn } from '@earendil-works/pi-tui';
 import { stripVTControlCharacters } from 'node:util';
 import type { UISettings } from './settings.ts';
 
@@ -18,11 +18,11 @@ export function registerPromptBorders(pi: ExtensionAPI, getSettings: () => UISet
       const color = getSettings().promptBorderColor;
       if (/^#[0-9a-f]{6}$/i.test(color)) {
         const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16));
-        return ctx.ui.theme.bg('userMessageBg', `\x1b[38;2;${channels.join(';')}m${text}${reset}`);
+        return `${reset}\x1b[38;2;${channels.join(';')}m${text}${reset}`;
       }
-      // Border glyphs occupy a complete terminal cell. Matching its background
-      // to the message removes the half-cell dark gap around horizontal rules.
-      return ctx.ui.theme.bg('userMessageBg', ctx.ui.theme.fg(color as any, text));
+      // Border cells must use the terminal background. Filling these cells
+      // colors the outer half of each glyph too, creating a visible blue halo.
+      return reset + ctx.ui.theme.fg(color as any, text) + reset;
     };
     function bordered(this: UserMessageComponent, width: number): string[] {
       const current = getSettings();
@@ -34,11 +34,34 @@ export function registerPromptBorders(pi: ExtensionAPI, getSettings: () => UISet
       // Keep the approved side spacing: one native column plus one filled
       // column. Remove only Pi's single outer padding row at each end below.
       const extra = inner >= 6 ? 1 : 0;
-      const source = original.call(this, inner - extra * 2);
+      const available = inner - extra * 2;
+      const labelRoom = current.promptStyle === 'accent' ? Math.max(0, available - 10) : 0;
+      const label = labelRoom ? truncateToWidth(current.promptLabel, labelRoom) : '';
+      const prefixWidth = label ? visibleWidth(label) + 2 : 0;
+      const source = original.call(this, available - prefixWidth);
       if (!source.length) return source;
-      const key = `${width}:${pad}:${paint('│')}:${ctx.ui.theme.bg('userMessageBg', ' ')}`;
+      const key = `${width}:${pad}:${current.promptStyle}:${current.promptLabel}:${paint('│')}:${ctx.ui.theme.bg('userMessageBg', ' ')}`;
       const previous = cache.get(this);
       if (previous?.source === source && previous.key === key) return previous.lines;
+      const gutter = ' '.repeat(pad);
+      const fill = (length: number) => ctx.ui.theme.bg('userMessageBg', ' '.repeat(length));
+      if (current.promptStyle === 'accent') {
+        const accent = paint(ctx.ui.theme.bg('userMessageBg', '▎'));
+        // Reserve label columns before native wrapping, then prefix only the
+        // first text row. Continuations align under the text, not the name.
+        const nativeWidth = available - prefixWidth;
+        const indent = Math.min(pi.getSettings?.().outputPad ?? 1, nativeWidth);
+        const firstText = source.findIndex(line => stripVTControlCharacters(line).trim() !== '');
+        const lines = source.map((nativeLine, index) => {
+          let line = prefixWidth ? fill(prefixWidth) + nativeLine : nativeLine;
+          if (label && index === firstText) {
+            line = fill(indent) + paint(ctx.ui.theme.bg('userMessageBg', label + ': ')) + sliceByColumn(nativeLine, indent, Math.max(0, nativeWidth - indent));
+          }
+          return gutter + accent + fill(extra) + line + reset + fill(Math.max(0, panelWidth - 1 - extra - visibleWidth(line))) + gutter;
+        });
+        cache.set(this, { source, key, lines });
+        return lines;
+      }
       let start = 0, end = source.length;
       const blank = (line: string) => stripVTControlCharacters(line).trim() === '';
       if (end > 1 && blank(source[0])) start++;
@@ -47,8 +70,6 @@ export function registerPromptBorders(pi: ExtensionAPI, getSettings: () => UISet
       const zones = (rows: string[]) => rows.join('').match(/\x1b\]133;[ABC](?:\x07|\x1b\\)/g)?.join('') ?? '';
       const before = zones(source.slice(0, start));
       const after = zones(source.slice(end));
-      const gutter = ' '.repeat(pad);
-      const fill = (length: number) => ctx.ui.theme.bg('userMessageBg', ' '.repeat(length));
       const top = before + gutter + paint('╭' + '─'.repeat(inner) + '╮') + gutter;
       const bottom = gutter + paint('╰' + '─'.repeat(inner) + '╯') + gutter + after;
       const lines = [top, ...source.slice(start, end).map(line => gutter + paint('│') + fill(extra) + line + reset + fill(Math.max(0, inner - extra - visibleWidth(line))) + paint('│') + gutter), bottom];

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Add a switchable solid accent-panel prompt style with a configurable inline `You:`/custom-name label and aligned continuations; system usernames are not exposed automatically.
+- Keep outlined prompt backgrounds inside the border, eliminating the blue halo.
+- Add coverage for custom/hidden labels, clipping, continuation alignment, solid fill and lifecycle restoration. Existing outline style remains the default; select the new style with `/ui set promptStyle accent`.
+
 ## 0.4.1
 
 - Let the same curl installer update older archive installs with a backup, rollback on failed replacement where possible, and no Pi re-registration.

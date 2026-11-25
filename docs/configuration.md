@@ -9,6 +9,8 @@ Run `/ui settings` to inspect active settings and their file path. Settings chan
 | verticalPadding | 1 | Integer 0–3 |
 | todos | true | true / false |
 | promptBorders | true | true / false |
+| promptStyle | outline | outline / accent |
+| promptLabel | You | Text up to 60 characters; empty string hides it |
 | promptBorderColor | #5F929B | Theme color below or six-digit hexadecimal color |
 | footer | detailed | compact / detailed |
 | previewLines | 12 | Integer 3–100 |
@@ -17,7 +19,7 @@ Run `/ui settings` to inspect active settings and their file path. Settings chan
 | successColor | borderMuted | Theme color below |
 | errorColor | error | Theme color below |
 
-Submitted prompts retain the active theme background and native Markdown rendering. Their outer terminal gutter uses the shared `padding` setting. The outline aligns with the shared panel gutter. No extra rows or columns are added outside the border; the border cells retain the message background to provide a thin blue rim. Pi's single top/bottom padding rows are removed, while side spacing and intentional blank lines inside messages remain unchanged. Exact pixel equality depends on the terminal font and cannot be guaranteed with whole character cells. `/ui reset` removes the decorator on reload; `/ui enable` restores it. `promptBorderColor` accepts colors such as `#5F929B` (muted cyan). The feature decorates Pi's exported user-message component; other extensions modifying the same renderer may conflict.
+Submitted prompts retain the active theme background and native Markdown rendering. `/ui set promptStyle accent` selects a solid filled panel with a thin left accent and no full outline; `/ui set promptStyle outline` restores the outlined style. `promptBorders` is the master enable switch for either style. Accent panels show a muted-cyan inline label (`You: message`) on the first text row; wrapped lines align under the message, without repeating the label. On very narrow terminals the label is hidden to leave room for message content. `/ui set promptLabel Omid` sets an explicit name, and `/ui set promptLabel ""` hides it. The default is `You`; no system username is read. Labels are plain text, clipped to the available width, and do not change stored prompts. Their outer terminal gutter uses the shared `padding` setting. The outline aligns with the shared panel gutter. No extra rows or columns are added outside the border. Border cells use the terminal background, while the original message background is confined to the interior, preventing a blue halo outside the outline. Pi's single top/bottom padding rows are removed, while side spacing and intentional blank lines inside messages remain unchanged. Exact pixel equality depends on the terminal font and cannot be guaranteed with whole character cells. `/ui reset` removes the decorator on reload; `/ui enable` restores it. `promptBorderColor` accepts colors such as `#5F929B` (muted cyan). The feature decorates Pi's exported user-message component; other extensions modifying the same renderer may conflict.
 
 Colors: `borderMuted`, `muted`, `dim`, `accent`, `warning`, `success`, `error`. These use the active theme rather than fixed RGB values.
 
