@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { resolvePiRoot } from './test-support.mjs';
+const root = resolvePiRoot(), require = createRequire(root + '/package.json');
+const jiti = require('jiti').createJiti(import.meta.url, { alias: { '@earendil-works/pi-tui': require.resolve('@earendil-works/pi-tui') } });
+const { PromptHistory, parseSuggestion, promptText, registerPromptSuggestions, renderHistoryGhost } = await jiti.import('./prompt-suggestions.ts');
+const { CURSOR_MARKER, renderFakeCursor, visibleWidth } = await import(require.resolve('@earendil-works/pi-tui'));
+const history = new PromptHistory();
+history.remember('Verify the first release');
+history.remember('Verify the latest release');
+history.remember('Verify\nanother line');
+assert.equal(history.suffix('vEr'), 'ify the latest release');
+assert.equal(history.suffix('ve'), undefined);
+assert.equal(history.suffix('Verify the latest release'), undefined);
+for (const text of ['/verify it', '@README.md notes', '!npm test', 'Review @README.md', 'Review ./README.md']) {
+  history.remember(text);
+  const prefix = text.slice(0, -1);
+  assert.equal(history.suffix(prefix), undefined);
+}
+assert.equal(promptText([{ type: 'image', data: 'omitted' }, { type: 'text', text: 'saved text' }]), 'saved text');
+const row = ' ver' + CURSOR_MARKER + renderFakeCursor(' ') + ' '.repeat(10);
+const ghost = renderHistoryGhost(row, 'ify the release', 20, 1, text => text);
+assert.ok(ghost.startsWith(' ver' + CURSOR_MARKER + renderFakeCursor('i') + 'fy'));
+assert.equal(visibleWidth(ghost), 20);
+assert.equal(renderHistoryGhost(row, '界', 6, 1, text => text), undefined);
+assert.equal(renderHistoryGhost(row, 'e\u0301', 6, 1, text => text), ' ver' + CURSOR_MARKER + renderFakeCursor('e\u0301') + ' ');
+for (let i = 0; i < 100; i++) history.remember(`Another prompt ${i}`);
+assert.equal(history.suffix('Ver'), undefined);
+history.clear(); assert.equal(history.suffix('Another'), undefined);
+const { defaults, validateSetting } = await jiti.import('./settings.ts');
+const prefix = 'Suggested next prompt: ';
+const prompt = 'Check the saved prompt history on another branch.';
+const tagged = prefix + prompt;
+assert.equal(defaults.promptSuggestions, false);
+assert.ok(validateSetting('promptSuggestions', true));
+assert.equal(validateSetting('promptSuggestions', 'true'), false);
+assert.equal(parseSuggestion(`Result.\n\n${tagged}\n`), prompt);
+for (const text of [tagged + '\nMore text', `\`\`\`txt\n${tagged}`, `~~~txt\n\`\`\`\n${tagged}`, `    ${tagged}`, `> ${tagged}`, prefix + '/reload', prefix + '!ls', prefix + 'x'.repeat(181), prefix + 'x\x1b[32m', prefix + 'abc\u202eX']) assert.equal(parseSuggestion(text), undefined, text);
+assert.equal(parseSuggestion(`\`\`\`\nexample\n\`\`\`\n${tagged}`), prompt);
+
+let enabled = false, redraws = 0;
+const events = {};
+const pi = { on: (name, fn) => { events[name] = fn; } };
+const ctx = { mode: 'tui' };
+const { current, clear } = registerPromptSuggestions(pi, () => enabled, () => redraws++);
+const start = (mode = 'tui', messageType = 'user') => {
+  const event = { messageType, systemPromptOptions: { promptGuidelines: ['existing'] } };
+  events.before_agent_start(event, { ...ctx, mode });
+  events.agent_start({}, { ...ctx, mode });
+  return event.systemPromptOptions.promptGuidelines;
+};
+const message = (text = tagged, extra = {}) => events.message_end({ message: { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text }], ...extra } }, ctx);
+const settle = (aborted = false) => events.agent_settled({ aborted }, ctx);
+assert.deepEqual(start(), ['existing']); message(); settle(); assert.equal(current(), undefined);
+enabled = true;
+assert.deepEqual(start('rpc'), ['existing']); message(); settle(); assert.equal(current(), undefined);
+assert.deepEqual(start('tui', 'custom'), ['existing']); message(); settle(); assert.equal(current(), undefined);
+assert.match(start()[1], /Do not call a tool/);
+message(); assert.equal(current(), undefined); settle(); assert.equal(current(), prompt);
+assert.equal(redraws, 1);
+clear(); assert.equal(current(), undefined); assert.equal(redraws, 2);
+clear(); assert.equal(redraws, 2);
+for (const stale of ['session_start', 'session_tree', 'session_shutdown', 'agent_start', 'before_agent_start']) {
+  start(); message(); settle(); assert.equal(current(), prompt);
+  events[stale]({}, ctx); assert.equal(current(), undefined, stale);
+}
+start(); message(); settle(true); assert.equal(current(), undefined);
+start(); message(); message('Done without a suggestion'); settle(); assert.equal(current(), undefined);
+start(); message(tagged, { stopReason: 'length' }); settle(); assert.equal(current(), undefined);
+start(); message(tagged, { content: [{ type: 'toolCall' }, { type: 'text', text: tagged }] }); settle(); assert.equal(current(), undefined);
+start(); message(); events.agent_start({}, ctx); settle(); assert.equal(current(), undefined);
+start(); events.message_end({ message: { role: 'toolResult', content: [{ type: 'text', text: tagged }] } }, ctx); settle(); assert.equal(current(), undefined);
+console.log('PASS: opt-in prompt suggestions, final-line validation, redraws and stale/aborted response cleanup');

@@ -7,6 +7,8 @@ import { registerAsk } from './ask.ts';
 import { registerPromptBorders } from './prompt-borders.ts';
 import { registerTokenUsage } from './token-usage.ts';
 import { registerTaskUsage } from './task-usage.ts';
+import { PromptHistory, promptText, registerPromptSuggestions, renderHistoryGhost } from './prompt-suggestions.ts';
+import { registerActivityStatus } from './activity-status.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
@@ -161,10 +163,19 @@ export default function (pi: ExtensionAPI) {
   registerAsk(pi, () => settings.enabled, () => settings.padding);
   registerPromptBorders(pi, () => settings);
   registerTaskUsage(pi, () => settings.enabled);
+  let editorUI: TUI | undefined;
+  const suggestions = registerPromptSuggestions(pi, () => settings.enabled && settings.promptSuggestions && !!editorUI, () => editorUI?.requestRender());
+  const promptHistory = new PromptHistory();
+  pi.on('message_end', (event, ctx) => {
+    if (ctx.mode === 'tui' && settings.enabled && settings.promptSuggestions && event.message.role === 'user') {
+      promptHistory.remember(promptText(event.message.content));
+    }
+  });
   let activeUI: TUI | undefined;
   const tokenUsage = registerTokenUsage(pi, () => settings.enabled && settings.tokenUsage, () => activeUI?.requestRender());
   const pendingTitles = new Map<string, string>();
   const titles = new Map<string, string>();
+  const activity = registerActivityStatus(pi, () => settings.enabled && settings.activityStatus, id => titles.get(id), () => settings.activityChars);
   pi.registerTool({
     name: 'ui_title', label: 'Display title', executionMode: 'sequential',
     description: 'Set a short display description for the next call of a named tool. Does not execute that tool.',
@@ -175,9 +186,13 @@ export default function (pi: ExtensionAPI) {
       return { content: [{ type: 'text', text: 'Title set' }], details: undefined };
     },
   });
-  pi.on('tool_call', event => {
+  pi.on('tool_call', (event, ctx) => {
     const title = pendingTitles.get(event.toolName);
-    if (title) { titles.set(event.toolCallId, title); pendingTitles.delete(event.toolName); pi.appendEntry('workbench-title', { id: event.toolCallId, title }); }
+    if (!title) return;
+    titles.set(event.toolCallId, title);
+    pendingTitles.delete(event.toolName);
+    pi.appendEntry('workbench-title', { id: event.toolCallId, title });
+    activity.updateTitle(ctx, event.toolCallId, title);
   });
   pi.on('agent_settled', () => {
     pendingTitles.clear();
@@ -185,7 +200,7 @@ export default function (pi: ExtensionAPI) {
     // component height changes. Never deduplicate or modify message content.
     if (settings.enabled && activeUI?.mode === 'fullscreen') activeUI.requestRender(true);
   });
-  pi.on('session_shutdown', () => { activeUI = undefined; });
+  pi.on('session_shutdown', () => { activeUI = undefined; editorUI = undefined; promptHistory.clear(); });
   pi.registerCommand('ui', {
     description: 'reset | enable | redraw | settings | set <key> <value>',
     handler: async (args, ctx) => {
@@ -232,6 +247,12 @@ export default function (pi: ExtensionAPI) {
     for (const e of ctx.sessionManager.getBranch()) {
       if (e.type === 'custom' && e.customType === 'workbench-title' && typeof (e.data as any)?.id === 'string' && typeof (e.data as any)?.title === 'string') titles.set((e.data as any).id, (e.data as any).title);
       if (e.type === 'custom' && ['workbench-plan', 'omp-plan'].includes(e.customType) && validPlan(e.data)) plan = structuredClone(e.data);
+    }
+    promptHistory.clear();
+    if (ctx.mode === 'tui' && settings.enabled && settings.promptSuggestions) {
+      for (const entry of ctx.sessionManager.buildContextEntries()) {
+        if (entry.type === 'message' && entry.message.role === 'user') promptHistory.remember(promptText(entry.message.content));
+      }
     }
     refresh(ctx);
   };
@@ -299,7 +320,37 @@ export default function (pi: ExtensionAPI) {
     // Do not replace an editor already owned by another extension.
     if (!ctx.ui.getEditorComponent()) {
       ctx.ui.setEditorComponent((tui, theme, keys) => {
+        editorUI = tui;
         class WorkbenchEditor extends CustomEditor {
+          private shownHistory?: { draft: string; suffix: string };
+          private suggestionReady() {
+            return settings.promptSuggestions && this.focused && !this.capturesViewportInput && ctx.isIdle();
+          }
+          private historySuffix(draft: string) {
+            const cursor = this.getCursor();
+            return cursor.line === 0 && cursor.col === draft.length ? promptHistory.suffix(draft) : undefined;
+          }
+          override handleInput(data: string) {
+            if (keys.matches(data, 'tui.input.tab') && this.suggestionReady()) {
+              const draft = this.getText();
+              if (draft) {
+                const visible = this.shownHistory;
+                if (visible?.draft === draft && visible.suffix === this.historySuffix(draft)) {
+                  this.shownHistory = undefined;
+                  this.insertTextAtCursor(visible.suffix);
+                  return;
+                }
+              } else {
+                const value = suggestions.current();
+                if (value) {
+                  suggestions.clear();
+                  this.insertTextAtCursor(value);
+                  return;
+                }
+              }
+            }
+            super.handleInput(data);
+          }
           // Pi reapplies editorPaddingX after constructing custom editors and
           // when its settings change. Keep our content aligned with our border.
           override setPaddingX(_padding: number): void {
@@ -309,13 +360,39 @@ export default function (pi: ExtensionAPI) {
             const inset = Math.min(settings.padding, Math.max(0, Math.floor((width - 1) / 2)));
             return ' '.repeat(inset) + super.renderTopBorder(Math.max(0, width - inset * 2), hiddenLineCount) + ' '.repeat(inset);
           }
+          protected renderBottomBorder(width: number, hiddenLineCount: number): string {
+            // Pi appends autocomplete rows after this border; never replace the last render row.
+            const inset = Math.min(settings.padding, Math.max(0, Math.floor((width - 1) / 2)));
+            return ' '.repeat(inset) + super.renderBottomBorder(Math.max(0, width - inset * 2), hiddenLineCount) + ' '.repeat(inset);
+          }
           render(width: number) {
             this.borderColor = text => ctx.ui.theme.fg('borderMuted', text);
             const lines = [...super.render(width)];
-            if (lines.length >= 2) {
-              const inset = Math.min(settings.padding, Math.max(0, Math.floor((width - 1) / 2)));
-              const border = ' '.repeat(inset) + ctx.ui.theme.fg('borderMuted', '─'.repeat(Math.max(0, width - inset * 2))) + ' '.repeat(inset);
-              lines[lines.length - 1] = border;
+            this.shownHistory = undefined;
+            if (lines.length !== 3 || !this.suggestionReady()) return lines;
+            const inset = Math.min(settings.padding, Math.max(0, Math.floor((width - 1) / 2)));
+            const draft = this.getText();
+            if (draft) {
+              const suffix = this.historySuffix(draft);
+              const row = suffix ? renderHistoryGhost(lines[1], suffix, width, inset, text => ctx.ui.theme.fg('dim', text)) : undefined;
+              if (suffix && row !== undefined) {
+                this.shownHistory = { draft, suffix };
+                lines[1] = row;
+              }
+              return lines;
+            }
+            const value = suggestions.current();
+            if (value) {
+              // Keep Pi's cursor marker and fake cursor; only replace trailing padding.
+              const row = lines[1].trimEnd();
+              const available = width - inset - visibleWidth(row);
+              if (available > 0) {
+                const hint = '  [Tab]';
+                const label = available >= visibleWidth(hint) + 8
+                  ? truncateToWidth(value, available - visibleWidth(hint)) + hint
+                  : truncateToWidth(value, available);
+                lines[1] = row + ctx.ui.theme.fg('dim', label) + ' '.repeat(width - visibleWidth(row) - visibleWidth(label));
+              }
             }
             return lines;
           }
@@ -326,8 +403,7 @@ export default function (pi: ExtensionAPI) {
         // Pi's addToHistory de-duplicates when startup also populates history.
         for (const entry of ctx.sessionManager.buildContextEntries()) {
           if (entry.type !== 'message' || entry.message.role !== 'user') continue;
-          const { content } = entry.message;
-          editor.addToHistory(typeof content === 'string' ? content : content.filter(block => block.type === 'text').map(block => block.text).join(''));
+          editor.addToHistory(promptText(entry.message.content));
         }
         return editor;
       });

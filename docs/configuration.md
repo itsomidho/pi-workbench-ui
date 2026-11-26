@@ -9,6 +9,9 @@ Run `/ui settings` to inspect active settings and their file path. Settings chan
 | verticalPadding | 1 | Integer 0–3 |
 | todos | true | true / false |
 | tokenUsage | true | Show shared-turn/tool-model labels and latest-turn footer status |
+| activityStatus | true | Use event-driven labels in Pi’s native working indicator |
+| activityChars | false | Add a live streamed reply character count to the working label; requires `activityStatus` |
+| promptSuggestions | false | Inline completion from session history as you type, plus an optional model-written placeholder in the empty editor; Tab accepts, Enter sends |
 | promptBorders | true | true / false |
 | promptStyle | right | right / outline / accent |
 | promptLabel | You | Text up to 60 characters; empty string hides it |

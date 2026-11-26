@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+
+- Add opt-in inline completion from recent prompts on the current branch. Tab inserts the visible suggestion’s suffix without a model request or automatic submission.
+- Preserve native slash-command and file autocomplete rows when drawing the editor’s bottom border.
+- Show live model and tool activity in Pi’s existing working indicator, including short tool titles and parallel tool counts.
+- Add an optional live reply character counter, clearly labeled as characters rather than tokens.
+- Add opt-in contextual next-prompt suggestions as dim text inside the empty editor. Tab inserts the suggestion as an editable draft without sending it or making an additional model request.
+- Validate both new runtime modules before replacing an older archive install.
+
 ## 0.8.1
 
 - Give the task usage dashboard more breathing room, an aligned token chart with muted end caps, and a summary that stacks on narrow terminals.
