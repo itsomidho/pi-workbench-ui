@@ -30,7 +30,7 @@ exit "${FAIL_PI:-0}"
         path = self.bin / name
         path.write_text(content)
         path.chmod(0o755)
-    def make_archive(self, name='pi-workbench-ui', version='0.9.0', missing_prompt=False, missing_tokens=False, missing_task=None):
+    def make_archive(self, name='pi-workbench-ui', version='0.9.1', missing_prompt=False, missing_tokens=False, missing_task=None):
         files = {'package.json': json.dumps({'name': name, 'version': version, 'pi': {'extensions': ['./index.ts']}}), 'index.ts': '// test', 'settings.ts': '// test', 'ask.ts': '// test', 'prompt-borders.ts': '// test', 'token-usage.ts': '// test', 'task-usage.ts': '// test', 'task-dashboard.ts': '// test', 'prompt-suggestions.ts': '// test', 'activity-status.ts': '// test'}
         if missing_prompt:
             files.pop('prompt-borders.ts')
@@ -55,7 +55,7 @@ exit "${FAIL_PI:-0}"
         self.assertTrue((self.dest / 'index.ts').is_file())
         self.assertFalse((self.dest / '.git').exists())
         self.assertIn('pi install ' + str(self.dest), self.log.read_text())
-        self.assertIn('/v0.9.0.tar.gz', self.log.read_text())
+        self.assertIn('/v0.9.1.tar.gz', self.log.read_text())
     def test_skip_registration(self):
         self.run_install('--no-register')
         self.assertNotIn('pi install', self.log.read_text())
@@ -85,7 +85,7 @@ exit "${FAIL_PI:-0}"
         self.run_install(success=False)
         self.assertFalse(self.dest.exists())
     def test_wrong_package_or_version(self):
-        for name, version in [('other', '0.9.0'), ('pi-workbench-ui', '9.9.9')]:
+        for name, version in [('other', '0.9.1'), ('pi-workbench-ui', '9.9.9')]:
             self.make_archive(name, version)
             self.run_install(success=False)
             self.assertFalse(self.dest.exists())
@@ -106,13 +106,13 @@ exit "${FAIL_PI:-0}"
     def test_upgrade_preserves_old_tree_and_skips_registration(self):
         self.seed_install()
         self.run_install(env={'FAIL_PI': '1'})
-        self.assertEqual(json.loads((self.dest / 'package.json').read_text())['version'], '0.9.0')
+        self.assertEqual(json.loads((self.dest / 'package.json').read_text())['version'], '0.9.1')
         self.assertTrue((self.dest / 'prompt-borders.ts').is_file())
         backup, = self.root.glob('installed.backup.*')
         self.assertEqual((backup / 'previous/local-note').read_text(), 'preserve me')
         self.assertNotIn('pi install', self.log.read_text())
     def test_current_version_is_unchanged(self):
-        self.seed_install('0.9.0')
+        self.seed_install('0.9.1')
         self.assertIn('already up to date', self.run_install().stdout)
         self.assertFalse(self.log.exists())
         self.assertEqual((self.dest / 'local-note').read_text(), 'preserve me')

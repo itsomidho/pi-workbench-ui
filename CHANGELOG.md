@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+- Document inline suggestion and activity-status implementation, settings, lifecycle behavior and runtime module ownership.
+- Expand QA documentation for native autocomplete, mock-provider streaming tests and remaining manual checks.
+- Clarify that streaming tests use local loopback mock providers without external model API calls. Runtime behavior is unchanged.
+
 ## 0.9.0
 
 - Add opt-in inline completion from recent prompts on the current branch. Tab inserts the visible suggestion’s suffix without a model request or automatic submission.
