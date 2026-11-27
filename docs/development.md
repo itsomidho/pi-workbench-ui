@@ -42,7 +42,7 @@ All three settings are validated in `settings.ts`; `/ui set <key> <value>` saves
 
 `PromptHistory` in `prompt-suggestions.ts` retains at most 100 eligible recent single-line prompts, up to 500 characters each. `index.ts` seeds it from the active branch’s `buildContextEntries()` projection and updates it on user-message completion. It is cleared/rebuilt on session or tree changes; compacted-away prompts are not guaranteed to be available. Prefix matching is case-insensitive and starts after three non-whitespace characters. No extra model request is made for history matching.
 
-The Workbench editor renders the suffix as dim ghost text only at the end of a single visible input line, while idle and focused. Tab accepts a currently rendered matching suffix into the draft; Enter remains the separate send action. Native autocomplete takes priority, and command, shell and file-reference contexts are excluded. Up/Down remains native prompt history. Render borders through the editor’s border hooks: Pi appends completion menu rows **after** the bottom border, so replacing the final rendered row hides suggestions.
+The Workbench editor renders the suffix as dim ghost text only at the end of a single visible input line, while idle and focused. Right Arrow accepts a currently rendered matching suffix into the draft; Enter remains the separate send action. Tab is left to native autocomplete, and command, shell and file-reference contexts are excluded. Up/Down remains native prompt history. Render borders through the editor’s border hooks: Pi appends completion menu rows **after** the bottom border, so replacing the final rendered row hides suggestions.
 
 When enabled in TUI mode, `registerPromptSuggestions` also adds guidance asking the model to optionally end its regular reply with `Suggested next prompt: <text>`. Only a valid final assistant line outside code fences becomes an empty-editor placeholder; the line remains in the transcript. Publication waits for `agent_settled`, and aborts/new runs/session changes clear it. This does not make a separate request, execute the suggestion or replace another extension’s editor. If a long-running tab retains old editor behavior after `/reload`, restart with `/quit` and `pi --continue` in the same project directory.
 
@@ -50,11 +50,23 @@ When enabled in TUI mode, `registerPromptSuggestions` also adds guidance asking 
 
 The optional counter counts Unicode code points in streamed reply text, including spaces and Markdown, not thinking, tool output or billed tokens. It resets on each model turn and limits count-label updates to roughly once per 125 ms; it is a live display, not a final accounting ledger.
 
+## Command palette
+
+`command-help.ts` keeps the command catalog used by `/ui help` and native `/ui` subcommand completion. Entries from all three groups include command syntax and a description; required argument placeholders are shown, not inserted. Match words case-insensitively against commands, descriptions and groups. The modal returns a draft only on explicit selection and the handler checks the editor is empty before setting its text. Do not call a command handler or submit a prompt from the palette. RPC and disabled custom UI get the same catalog as text. `modal-frame.ts` shares layout and width/height limits with the Changes overlay.
+
+## Working tree changes
+
+`/ui changes` opens `ChangesPanel` on demand. `working-tree.ts` calls Git directly without a shell, disables optional index locks and external diff/textconv, and reads NUL-delimited status so spaces and newlines stay part of paths. Tracked previews use literal pathspecs and separate index/worktree requests. Untracked previews are bounded local reads of regular files; out-of-worktree paths and symlinks are not previewed. File content and names are sanitized before terminal rendering. The panel uses Pi’s exported `getLanguageFromPath` and `highlightCode` for the validated untracked text body only, preserving multiline syntax tokens. Highlighted lines are cached until preview replacement or theme invalidation; ANSI-aware clipping/panning keeps the code within the panel. Unknown languages and skipped-file notices remain plain text; tracked diffs retain their line-based colors.
+
+Status is limited to 1 MiB and 1,000 listed paths. Each preview section is limited to 64 KiB and 400 lines; long visible lines can be panned horizontally. Git calls time out after six seconds. The panel aborts an in-flight preview when it closes or returns to the list. It never attributes changes to the model or mutates the repository. The list can go stale while the worktree changes; refresh with `r`.
+
 ## Files
 
 - `index.ts`: extension, UI components, tool presentation and session state.
 - `ask.ts`, `ask-test.mjs`, `ask-terminal-test.py`: Ask component/tool and keyboard/runtime tests.
 - `settings.ts`: validated persistent settings.
+- `command-help.ts`, `modal-frame.ts`, `command-help-test.mjs`, `command-help-terminal-test.py`: searchable command catalog, shared overlay frame and draft-only selection tests.
+- `working-tree.ts`, `changes-panel.ts`, `changes-test.mjs`, `changes-terminal-test.py`: bounded Git status/preview, keyboard overlay and disposable Git fixture tests.
 - `prompt-suggestions.ts`, `prompt-suggestions-test.mjs`, `prompt-suggestions-terminal-test.py`: bounded history matching, ghost-text rendering, final-response parsing/lifecycle tests and a real Pi loopback-provider acceptance test.
 - `activity-status.ts`, `activity-status-test.mjs`, `activity-status-terminal-test.py`: native working labels, optional reply character counting, parallel/nested tool state and a real Pi loopback-provider cancellation test.
 - `task-usage.ts`, `task-dashboard.ts`, task usage/dashboard unit and RPC/PTY tests: branch-scoped accounting, run-ledger provenance, private export and interactive snapshot dashboard.

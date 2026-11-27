@@ -42,26 +42,27 @@ pi.registerProvider('suggestion-fixture', {{ baseUrl: 'http://127.0.0.1:{port}/v
     try:
         wait_for(b'No tasks yet')
         os.write(master, b'What happened in the terminal?\r')
-        wait_for((suggestion_for(1) + '  [Tab]').encode())
+        wait_for((suggestion_for(1) + '  [→]').encode())
         assert len(requests) == 1, len(requests)
         assert 'Do not call a tool or start any additional work' in json.dumps(requests[0]['messages'])
         os.write(master, b'\r'); time.sleep(.25)
         assert len(requests) == 1, 'Enter submitted an unaccepted placeholder'
         os.write(master, b'My draft'); wait_for(b'My draft')
-        os.write(master, b'\t\r'); wait_for((suggestion_for(2) + '  [Tab]').encode())
+        os.write(master, b'\x1b[D\x1b[D\x1b[C\x1b[C'); time.sleep(.15)
+        os.write(master, b'\t\r'); wait_for((suggestion_for(2) + '  [→]').encode())
         assert len(requests) == 2 and requests[1]['messages'][-1]['content'] == [{'type': 'text', 'text': 'My draft'}]
-        os.write(master, b'\t'); wait_for(suggestion_for(2).encode())
-        assert len(requests) == 2, 'Tab submitted the suggestion'
-        os.write(master, b'\r'); wait_for((suggestion_for(3) + '  [Tab]').encode())
+        os.write(master, b'\x1b[C'); wait_for(suggestion_for(2).encode())
+        assert len(requests) == 2, 'Right Arrow submitted the suggestion'
+        os.write(master, b'\r'); wait_for((suggestion_for(3) + '  [→]').encode())
         assert len(requests) == 3 and requests[2]['messages'][-1]['content'] == [{'type': 'text', 'text': suggestion_for(2)}]
         # Case mismatch distinguishes ghost text from the previously submitted transcript.
         os.write(master, b'wha'); wait_for(b'what happened in the terminal?', plain=True)
         assert len(requests) == 3, 'Typing the history prefix made a request'
-        os.write(master, b'\t'); time.sleep(.2)
-        assert len(requests) == 3, 'Tab submitted the historical continuation'
-        os.write(master, b' Again.\r'); wait_for((suggestion_for(4) + '  [Tab]').encode())
+        os.write(master, b'\x1b[C'); time.sleep(.2)
+        assert len(requests) == 3, 'Right Arrow submitted the historical continuation'
+        os.write(master, b' Again.\r'); wait_for((suggestion_for(4) + '  [→]').encode())
         assert len(requests) == 4 and requests[3]['messages'][-1]['content'] == [{'type': 'text', 'text': 'what happened in the terminal? Again.'}]
-        print('PASS: real Pi inline next prompt and history suffix, editable Tab insertion, normal draft keys and explicit Enter')
+        print('PASS: real Pi inline next prompt and history suffix, editable Right Arrow insertion, normal draft keys and explicit Enter')
     finally:
         process.terminate()
         try: process.wait(timeout=5)

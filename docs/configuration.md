@@ -11,7 +11,7 @@ Run `/ui settings` to inspect active settings and their file path. Settings chan
 | tokenUsage | true | Show shared-turn/tool-model labels and latest-turn footer status |
 | activityStatus | true | Use event-driven labels in Pi’s native working indicator |
 | activityChars | false | Add a live streamed reply character count to the working label; requires `activityStatus` |
-| promptSuggestions | false | Inline completion from session history as you type, plus an optional model-written placeholder in the empty editor; Tab accepts, Enter sends |
+| promptSuggestions | false | Inline completion from session history as you type, plus an optional model-written placeholder in the empty editor; Right Arrow accepts, Enter sends; Tab remains native autocomplete |
 | promptBorders | true | true / false |
 | promptStyle | right | right / outline / accent |
 | promptLabel | You | Text up to 60 characters; empty string hides it |

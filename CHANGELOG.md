@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+
+- Use Right Arrow instead of Tab to accept inline ghost text; preserve Tab for native autocomplete.
+- Use native language syntax highlighting for untracked code previews in `/ui changes`; preserve tracked diff colors and plain-text fallback.
+- Add `/ui help`, a searchable, grouped command palette with descriptions, argument hints and draft-only insertion.
+- Add `/ui changes`, a read-only working-tree browser for staged, unstaged, untracked and conflicted paths, with bounded per-file previews.
+- Validate all four Changes/help runtime modules before replacing an older archive install.
+
 ## 0.9.1
 
 - Document inline suggestion and activity-status implementation, settings, lifecycle behavior and runtime module ownership.

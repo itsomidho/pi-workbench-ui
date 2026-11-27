@@ -1,5 +1,5 @@
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from '@earendil-works/pi-coding-agent';
-import { Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI } from '@earendil-works/pi-tui';
+import { Text, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type TUI } from '@earendil-works/pi-tui';
 import { Type } from 'typebox';
 import { stripVTControlCharacters } from 'node:util';
 import { defaults, loadSettings, saveSetting, settingsPath } from './settings.ts';
@@ -9,6 +9,8 @@ import { registerTokenUsage } from './token-usage.ts';
 import { registerTaskUsage } from './task-usage.ts';
 import { PromptHistory, promptText, registerPromptSuggestions, renderHistoryGhost } from './prompt-suggestions.ts';
 import { registerActivityStatus } from './activity-status.ts';
+import { openChangesPanel } from './changes-panel.ts';
+import { openCommandHelp, uiCommandCompletions } from './command-help.ts';
 
 type Item = { text: string; status: 'pending' | 'in_progress' | 'completed' };
 type Plan = { title: string; items: Item[] };
@@ -202,10 +204,22 @@ export default function (pi: ExtensionAPI) {
   });
   pi.on('session_shutdown', () => { activeUI = undefined; editorUI = undefined; promptHistory.clear(); });
   pi.registerCommand('ui', {
-    description: 'reset | enable | redraw | settings | set <key> <value>',
+    description: 'help | changes | settings | set <key> <value> | redraw | reset | enable',
+    getArgumentCompletions: uiCommandCompletions,
     handler: async (args, ctx) => {
       const [action, key, ...parts] = args.trim().split(/\s+/);
       try {
+        if (action === 'help') {
+          if (key) ctx.ui.notify('Usage: /ui help', 'info');
+          else await openCommandHelp(ctx, settings.enabled);
+          return;
+        }
+        if (action === 'changes') {
+          if (key) ctx.ui.notify('Usage: /ui changes', 'info');
+          else if (!settings.enabled) ctx.ui.notify('Custom UI is disabled; use /ui enable first.', 'info');
+          else await openChangesPanel(ctx);
+          return;
+        }
         if (action === 'redraw') {
           if (activeUI) activeUI.requestRender(true);
           else ctx.ui.notify('No active custom UI to redraw.', 'info');
@@ -331,7 +345,7 @@ export default function (pi: ExtensionAPI) {
             return cursor.line === 0 && cursor.col === draft.length ? promptHistory.suffix(draft) : undefined;
           }
           override handleInput(data: string) {
-            if (keys.matches(data, 'tui.input.tab') && this.suggestionReady()) {
+            if (matchesKey(data, 'right') && this.suggestionReady()) {
               const draft = this.getText();
               if (draft) {
                 const visible = this.shownHistory;
@@ -387,7 +401,7 @@ export default function (pi: ExtensionAPI) {
               const row = lines[1].trimEnd();
               const available = width - inset - visibleWidth(row);
               if (available > 0) {
-                const hint = '  [Tab]';
+                const hint = '  [→]';
                 const label = available >= visibleWidth(hint) + 8
                   ? truncateToWidth(value, available - visibleWidth(hint)) + hint
                   : truncateToWidth(value, available);

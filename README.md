@@ -32,7 +32,7 @@ Extensions execute with your user permissions. Review code before installation.
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-This downloads the tagged **v0.9.1** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+This downloads the tagged **v0.10.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
 
 Alternatively, let Pi manage a Git package:
 
@@ -73,6 +73,8 @@ If the checkout has local changes or cannot fast-forward, resolve them before up
 | `/todos all` | Show all tasks |
 | `/todos up` / `/todos down` | Scroll the four-item TODO viewport |
 | `/todos follow` | Resume automatically following the active item |
+| `/ui help` | Search Workbench UI commands and insert one as an editable draft |
+| `/ui changes` | Inspect staged, unstaged, and untracked Git changes in a read-only panel |
 | `/ui settings` | Show configuration and its file path |
 | `/ui set <key> <value>` | Save a setting and reload |
 | `/ui reset` | Disable custom UI and reload |
@@ -87,15 +89,25 @@ The empty-panel hint suggests `/think`, which is provided by Pi Workbench—not 
 
 The `ui_title` tool gives the next call of a named tool an explicit task description. Shell commands can also begin with a descriptive `# comment`. Titles do not borrow unrelated TODO text.
 
+## Command palette
+
+Run `/ui help` for **UI**, **TODOs**, and **Task usage** commands with short descriptions and argument hints. Type to filter; use **↑/↓** or **PageUp/PageDown** to navigate. **Enter** inserts the selection into an empty editor without running it or copying the argument placeholders, and **Esc** closes the panel. Fill in any required arguments and press Enter in the editor when you’re ready. A draft already in the editor is never replaced. If custom UI is disabled or you use RPC, `/ui help` shows a plain-text list. `/ui settings` is unchanged.
+
+## Working tree changes
+
+Run `/ui changes` from a Git worktree to inspect current staged, unstaged, untracked, and conflicted paths. Use **↑/↓** to select, **Enter** to preview, **PageUp/PageDown** to scroll, and **←/→** to see beyond the visible part of long lines. **Esc** returns from a preview to the list, **r** refreshes the list, and **q** closes the panel.
+
+This is a snapshot of **all Git changes**, not an attribution of edits to the current session or AI. A file modified in both places has separate staged and unstaged diffs. Untracked text files show a bounded preview with Pi’s syntax coloring when their filename identifies a supported language. Unknown file types remain plain text; tracked diffs keep green/red added/removed lines. Binary files and untracked symlinks aren’t opened as text. Large previews and lists have visible limits. The panel does not stage, commit, apply patches or call a model. Requires Git on PATH and the interactive UI.
+
 ## Live working indicator
 
 The existing Pi spinner shows short activity labels such as **Waiting for model**, **Editing index.ts**, **Running 2 tools**, and **Writing reply**. Labels use tool and streaming events, not a separate AI request. The indicator uses explicit tool titles or leading shell title comments where available; otherwise it shows a short action or filename, never full command bodies or tool output. Run `/ui set activityStatus false` to keep Pi’s default label. Optionally try `/ui set activityChars true` for **Writing reply · 128 chars**. This counts streamed reply text (Unicode code points, including spaces and Markdown), not thinking, tool output or tokens, and resets on each model turn. Turn it off with `/ui set activityChars false`.
 
 ## Inline prompt suggestions
 
-Enable with `/ui set promptSuggestions true`. If an already-running Pi tab still uses the previous editor behavior after `/reload`, restart it with `/quit` and `pi --continue` from the same project directory. Start typing at least three characters of a prompt you’ve previously sent on the current session branch. A matching recent, single-line prompt can appear as dim text immediately after the cursor. **Tab** adds the full suffix to your editable draft; **Enter** sends it. Matching is local and case-insensitive. It doesn’t make model requests or invent wording when there’s no match.
+Enable with `/ui set promptSuggestions true`. If an already-running Pi tab still uses the previous editor behavior after `/reload`, restart it with `/quit` and `pi --continue` from the same project directory. Start typing at least three characters of a prompt you’ve previously sent on the current session branch. A matching recent, single-line prompt can appear as dim text immediately after the cursor. **Right Arrow (→)** adds the full suffix to your editable draft; **Enter** sends it. Matching is local and case-insensitive. It doesn’t make model requests or invent wording when there’s no match.
 
-In an empty editor, the AI can still offer one suggested follow-up as part of its regular reply. That placeholder clears on a new run, reload or branch switch. Native slash-command and file completion take priority, and Up/Down history is unchanged. Neither suggestion runs automatically or replaces another extension’s editor. Set `promptSuggestions` to `false` to turn both off.
+In an empty editor, the AI can still offer one suggested follow-up as part of its regular reply. That placeholder clears on a new run, reload or branch switch. Tab remains native slash-command/file autocomplete, and Up/Down history is unchanged. Right Arrow accepts the ghost text (including the empty-editor follow-up) without sending it; otherwise it moves the cursor normally. Neither suggestion runs automatically or replaces another extension’s editor. Set `promptSuggestions` to `false` to turn both off.
 
 ## Ask box
 

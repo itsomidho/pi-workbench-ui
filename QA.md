@@ -16,13 +16,21 @@ Native autocomplete PTY coverage types a slash-command prefix and a file referen
 
 `prompt-suggestions-test.mjs` covers bounded/recent history matching, case-insensitive prefixes, ineligible command/file contexts, Unicode ghost rendering, next-prompt final-line validation, opt-in/non-TUI behavior, aborts and session/run cleanup. It rejects suggestions inside code fences or from tool results. History completion uses saved context, not an AI request.
 
-`prompt-suggestions-terminal-test.py` starts real Pi with a loopback HTTP mock provider. It verifies an empty-editor placeholder, Enter without accepting sends nothing, Tab preserves an unrelated draft, and Tab acceptance does not send until Enter. It also types a lowercase prefix of a previous prompt, checks the visible ghost suffix, accepts it with Tab, edits it, then verifies the exact submitted text. Request counts distinguish acceptance from submission. The mock does not contact a paid/external provider.
+`prompt-suggestions-terminal-test.py` starts real Pi with a loopback HTTP mock provider. It verifies an empty-editor placeholder, Enter without accepting sends nothing, Tab preserves an unrelated draft, and Right Arrow acceptance does not send until Enter. It also types a lowercase prefix of a previous prompt, checks the visible ghost suffix, accepts it with Right Arrow, edits it, then verifies the exact submitted text. Request counts distinguish acceptance from submission. The mock does not contact a paid/external provider.
 
 ## Live working indicator
 
 `activity-status-test.mjs` covers safe filename/title labels, generic shell-command fallback, parallel/nested leaf-tool counts, repeated-stream-update suppression and settlement/session cleanup. Character-counter tests cover default-off behavior, Unicode code points split across chunks and turn reset. The counter is not a token estimate or billing measurement.
 
 `activity-status-terminal-test.py` uses a real Pi PTY and loopback mock provider with a tool call. It verifies the waiting label, an explicit tool title in the actual editor border (not merely in transcript arguments), the enabled reply character count, settlement and Escape cancellation back to idle. Titles arriving after the tool-start event are exercised. These mocks demonstrate integration behavior, not compatibility with every provider or extension that changes the working label.
+
+## Command palette
+
+Palette regressions check grouped/searchable syntax, descriptions, required-argument prefixes, empty/missing results, narrow layouts and plain-text fallback. A real Pi PTY runs `/ui help`, filters commands, inserts `/ui reset` without changing settings, appends a required argument to a draft, and verifies Escape after a 40-column resize. A command-handler fixture verifies an existing draft is not overwritten.
+
+## Working tree changes
+
+`changes-test.mjs` uses disposable Git worktrees to cover clean/non-Git projects, staged and unstaged content in the same file, renames, literal/special paths, untracked text/binary/symlinks, large-preview truncation, terminal-control sanitization and cancellation. It checks that previews do not change index bytes or invoke the configured external diff command. Syntax tests check native TypeScript colors, multiline tokens, cached/theme-invalidated rendering, ANSI-aware clipping/panning, unknown-language and binary fallbacks, and truncation-notice isolation. `changes-terminal-test.py` checks actual ANSI keyword coloring in an untracked TypeScript preview and opens `/ui changes` in real Pi, selects tracked and untracked previews, resizes to 40 columns, refreshes and returns to the editor without model requests.
 
 ## Reports and remaining manual checks
 
@@ -37,7 +45,7 @@ Manual release checklist (not yet verified):
 - Exercise the installed usage-status/router extensions together and confirm metrics update.
 - Compare typing latency before/after enabling this extension under normal system load.
 - Run /ui reset and /ui enable interactively; verify native editor/footer/tool backgrounds return.
-- With `/ui set promptSuggestions true`, compare ghost text/cursor contrast in light/dark themes; verify Tab inserts and Enter sends, cursor movement/typing hides inappropriate suffixes, and native slash/file menus still take priority.
+- With `/ui set promptSuggestions true`, compare ghost text/cursor contrast in light/dark themes; verify Right Arrow inserts and Enter sends, cursor movement/typing hides inappropriate suffixes, and native slash/file menus still take priority.
 - Exercise suggestions with real session reload/resume, compaction and branch navigation; verify old AI next-prompt placeholders do not carry over and history matches only available current-branch prompts. If a long-running tab keeps old editor behavior, use `/quit` followed by `pi --continue` in the same project directory.
 - Exercise `activityStatus` with actual tools and companion extensions, then test `activityChars` on/off during a streamed reply. Verify labels stay readable at narrow widths and the count is clearly characters, not tokens.
 - Check Tab and other shortcuts through the user’s actual terminal/tmux setup. Automated PTYs do not certify every terminal protocol or multiplexer.

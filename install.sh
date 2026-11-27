@@ -3,12 +3,12 @@
 main() {
 set -euo pipefail
 
-version=v0.9.1
+version=v0.10.0
 destination="${HOME:?HOME must be set}/.pi-workbench-ui"
 register=true
 usage() {
   printf '%s\n' 'Usage: bash install.sh [--version vX.Y.Z] [--dir /absolute/path] [--no-register]' \
-    'Defaults: --version v0.9.1 --dir ~/.pi-workbench-ui' \
+    'Defaults: --version v0.10.0 --dir ~/.pi-workbench-ui' \
     'Requires Bash, curl, tar, Node.js 22.13+, GNU mv, and Pi for fresh registration.' \
     'Recognized older archive installs are backed up and updated. Git checkouts and symlinks are refused.'
 }
@@ -24,7 +24,7 @@ while [ "$#" -gt 0 ]; do
     *) fail "Unknown option: $1" ;;
   esac
 done
-[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Version must be a release tag such as v0.9.1'
+[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Version must be a release tag such as v0.10.0'
 # Normalize trailing slashes so dangling symlinks are detected too.
 while [[ "$destination" = */ ]]; do destination="${destination%/}"; done
 [[ "$destination" = /* ]] && [ "$destination" != / ] || fail 'Installation directory must be an absolute path other than /'
@@ -80,6 +80,9 @@ if (major > 0n || minor >= 4n) regular('prompt-borders.ts');
 if (major > 0n || minor >= 7n) regular('token-usage.ts');
 if (major > 0n || minor >= 8n) { regular('task-usage.ts'); regular('task-dashboard.ts'); }
 if (major > 0n || minor >= 9n) { regular('prompt-suggestions.ts'); regular('activity-status.ts'); }
+if (major > 0n || minor >= 10n) {
+  for (const file of ['working-tree.ts', 'changes-panel.ts', 'command-help.ts', 'modal-frame.ts']) regular(file);
+}
 if (mode === 'installed') {
   const difference = installed.findIndex((part, index) => part !== target[index]);
   console.log(difference === -1 ? 'same' : installed[difference] < target[difference] ? 'older' : 'newer');
