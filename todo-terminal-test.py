@@ -8,7 +8,7 @@ const { SessionManager } = await import(resolvePiRoot() + '/dist/index.js');
 const sm = SessionManager.create(process.cwd(), process.env.FIXTURE_DIR);
 sm.appendMessage({ role: 'user', content: [{ type: 'text', text: 'Older saved prompt' }], timestamp: Date.now() });
 sm.appendMessage({ role: 'user', content: [{ type: 'text', text: 'Newest saved prompt' }], timestamp: Date.now() });
-sm.appendCustomEntry('workbench-plan', { title: 'Scroll fixture', items: Array.from({ length: 9 }, (_, i) => ({ text: 'Task ' + (i + 1), status: i === 6 ? 'in_progress' : 'pending' })) });
+sm.appendCustomEntry('workbench-plan', { title: 'Scroll fixture', items: Array.from({ length: 9 }, (_, i) => ({ text: 'Task ' + (i + 1), status: i < 6 ? 'completed' : 'pending' })) });
 console.log(sm.getSessionFile());
 '''
     session = subprocess.check_output(['node', '--input-type=module', '-e', create], cwd=root, env=dict(os.environ, FIXTURE_DIR=directory), text=True).strip()
@@ -39,18 +39,22 @@ console.log(sm.getSessionFile());
         os.write(master, b'\x1b[B'); text = drain(.6)
         assert 'Newest saved prompt' in text, text[-5000:]
         os.write(master, b'\x03'); drain(.5)
-        # Xterm modifier 7 = Ctrl+Alt. Plain arrows remain editor/history keys.
-        os.write(master, b'\x1b[1;7A'); text = drain(.7)
+        # Alt+letter uses an Escape prefix. Plain arrows remain history keys.
+        os.write(master, b'\x1bk'); text = drain(.7)
         assert '4–7 of 9' in text and '/todos follow' in text, text[-5000:]
-        os.write(master, b'\x1b[1;7B'); text = drain(.7)
+        os.write(master, b'\x1bj'); text = drain(.7)
         assert '5–8 of 9' in text, text[-5000:]
         os.write(master, b'/todos follow\r'); text = drain(.8)
         assert 'following' in text, text[-5000:]
         os.write(master, 'draft 日本語'.encode()); drain(.5)
+        os.write(master, b'\x1bk'); text = drain(.7)
+        assert '4–7 of 9' in text and '/todos follow' in text, text[-5000:]
+        os.write(master, b'\x1bj'); text = drain(.7)
+        assert '5–8 of 9' in text, text[-5000:]
         resize(40); process.send_signal(signal.SIGWINCH); text = drain(.7)
         assert 'draft 日本語' in text and '5–8 of 9' in text, text[-5000:]
         assert process.poll() is None and 'TypeError:' not in text
-        print('PASS: real Pi prompt history after reload, TODO Ctrl+Alt+arrows, follow command, draft typing and 40-column resize')
+        print('PASS: real Pi next-pending TODO auto-follow without an active task, history after reload, Alt+K/J scrolling with a draft, follow command, draft typing and 40-column resize')
     finally:
         process.terminate()
         try: process.wait(timeout=5)

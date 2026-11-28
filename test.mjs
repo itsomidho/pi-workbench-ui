@@ -72,11 +72,15 @@ const four = { title: 'Four', items: Array.from({ length: 4 }, (_, i) => ({ text
 await tools[0].execute('four', four, undefined, undefined, ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /Row 0/);
 assert.equal(widget(tui, theme).render(80).filter(line => /Row \d/.test(line)).length, 4);
-assert.doesNotMatch(widget(tui, theme).render(80).join('\n'), /of 4|Ctrl\+Alt/);
+assert.doesNotMatch(widget(tui, theme).render(80).join('\n'), /of 4|Alt\+[KJ]/);
 // Dedicated shortcuts and commands scroll without appending plan entries.
 await tools[0].execute('long-again', long, undefined, undefined, ctx);
 const scrollEntries = entries.length;
-await shortcuts['ctrl+alt+up'].handler(ctx);
+assert.ok(shortcuts['alt+k'] && shortcuts['alt+j']);
+assert.equal(shortcuts['ctrl+alt+up'], undefined);
+assert.equal(shortcuts['ctrl+alt+down'], undefined);
+assert.match(widget(tui, theme).render(100).join('\n'), /Alt\+K ↑ \/ Alt\+J ↓/);
+await shortcuts['alt+k'].handler(ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /10–13 of 15/);
 assert.match(widget(tui, theme).render(80).join('\n'), /\/todos follow/);
 const advanced = { ...long, items: long.items.map((item, i) => ({ ...item, status: i === 14 ? 'in_progress' : 'pending' })) };
@@ -84,9 +88,9 @@ await tools[0].execute('advance', advanced, undefined, undefined, ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /10–13 of 15/);
 await commands.todos.handler('down', ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /11–14 of 15/);
-await shortcuts['ctrl+alt+down'].handler(ctx);
+await shortcuts['alt+j'].handler(ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /12–15 of 15/);
-await shortcuts['ctrl+alt+down'].handler(ctx);
+await shortcuts['alt+j'].handler(ctx);
 assert.match(widget(tui, theme).render(80).join('\n'), /12–15 of 15/);
 assert.equal(entries.length, scrollEntries + 1);
 await commands.todos.handler('follow', ctx);
@@ -99,7 +103,7 @@ assert.match(notifications.at(-1), /Usage:/);
 assert.ok(widget);
 // Hidden panels ignore scroll shortcuts; commands make the panel visible.
 await commands.todos.handler('', ctx);
-await shortcuts['ctrl+alt+up'].handler(ctx);
+await shortcuts['alt+k'].handler(ctx);
 assert.equal(widget, undefined);
 await commands.todos.handler('up', ctx);
 assert.ok(widget);
@@ -114,7 +118,39 @@ assert.equal(viewport.start(fifty.slice(0, 5)), 1);
 assert.equal(viewport.start(fifty), 1); // Shrink clamps the manual offset, not just the rendered position.
 viewport.reset(); assert.equal(viewport.start(fifty), 46);
 for (const width of [0, 1, 2, 10, 40, 80]) for (const line of widget(tui, theme).render(width)) assert.ok(visibleWidth(line) <= width);
-console.log('PASS: four-item TODO viewport, scrolling boundaries, paused/follow mode, tree restoration and separate shortcuts');
+// Completion-only updates must follow pending work without mutating task data.
+for (let count = 0; count <= 50; count++) {
+ const v = new TodoViewport();
+ for (let done = 0; done <= count; done++) {
+  const items = Array.from({ length: count }, (_, i) => ({ text: 'Task ' + i, status: i < done ? 'completed' : 'pending' }));
+  const before = structuredClone(items), start = v.start(items), last = Math.max(0, count - 4);
+  assert.equal(start, done === count ? last : Math.min(last, Math.max(0, done - 2)));
+  if (done < count) assert.ok(start <= done && done < start + v.size);
+  assert.deepEqual(items, before);
+ }
+}
+const pendingTail = Array.from({ length: 12 }, (_, i) => ({ text: 'Next ' + i, status: i < 8 ? 'completed' : 'pending' }));
+const automatic = new TodoViewport();
+assert.equal(automatic.start(pendingTail), 6);
+const activeAfterPending = pendingTail.map((item, i) => ({ ...item, status: i === 11 ? 'in_progress' : item.status }));
+assert.equal(automatic.start(activeAfterPending), 8, 'active takes priority over earlier pending');
+automatic.scroll(-100, pendingTail);
+const finishedTail = pendingTail.map(item => ({ ...item, status: 'completed' }));
+assert.equal(automatic.start(finishedTail), 0, 'manual browsing pauses follow even on completion');
+automatic.reset(); assert.equal(automatic.start(finishedTail), 8);
+const completionPlan = { title: 'Completion only', items: pendingTail };
+await tools[0].execute('pending-follow', completionPlan, undefined, undefined, ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /7–10 of 12.*following/);
+assert.match(widget(tui, theme).render(80).join('\n'), /□  Next 8/);
+await commands.todos.handler('up', ctx);
+await tools[0].execute('finished-follow', { ...completionPlan, items: finishedTail }, undefined, undefined, ctx);
+assert.match(widget(tui, theme).render(80).join('\n'), /6–9 of 12.*\/todos follow/);
+const beforeResume = entries.length;
+await commands.todos.handler('follow', ctx);
+assert.equal(entries.length, beforeResume, 'following changes presentation only');
+assert.match(widget(tui, theme).render(80).join('\n'), /9–12 of 12.*following/);
+assert.match(widget(tui, theme).render(80).join('\n'), /✓  Next 11/);
+console.log('PASS: TODO active/next-pending/completed auto-follow, 0–50-item completion transitions, manual pause/resume, tree restoration and separate shortcuts');
 await tools[0].execute('reset', plan, undefined, undefined, ctx);
 for (const width of [1, 2, 3, 4, 10, 40, 80]) {
  const component = frame(new Text('日本語 wide text\nsecond', 0, 0), 'done · 1.20s', 'bottom', s => s);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+
+- Expand `/ui help` with searchable guidance for all 18 UI settings: purpose, current/default values, allowed values and draft-only examples.
+- Wrap long command descriptions instead of clipping them; keep multiline selection and page navigation visible across terminal sizes.
+- Share accepted-value metadata between settings validation and help; clarify keyboard navigation, device-local preferences and `/ui reset` behavior.
+- Automatically follow the next pending TODO when no task is active, and show the final four items when a plan is completed; preserve paused manual browsing.
+- Replace OS-conflicting Ctrl+Alt+Up/Down TODO shortcuts with Alt+K (up) / Alt+J (down); update the panel hint and searchable command help.
+- Update archive installer defaults and installation examples to v0.11.0.
+
 ## 0.10.0
 
 - Use Right Arrow instead of Tab to accept inline ghost text; preserve Tab for native autocomplete.

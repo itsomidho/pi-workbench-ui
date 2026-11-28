@@ -24,7 +24,11 @@ export class TodoViewport {
   reset() { this.manualStart = undefined; }
   start(items: readonly Item[]) {
     const active = items.findIndex(item => item.status === 'in_progress');
-    const start = Math.max(0, Math.min(Math.max(0, items.length - this.size), this.manualStart ?? Math.max(0, active - 2)));
+    const target = active >= 0 ? active : items.findIndex(item => item.status === 'pending');
+    const lastStart = Math.max(0, items.length - this.size);
+    // Keep context around unfinished work; a completed plan ends on its final page.
+    const automaticStart = target >= 0 ? Math.max(0, target - 2) : lastStart;
+    const start = Math.max(0, Math.min(lastStart, this.manualStart ?? automaticStart));
     if (this.manualStart !== undefined) this.manualStart = start;
     return start;
   }
@@ -211,7 +215,7 @@ export default function (pi: ExtensionAPI) {
       try {
         if (action === 'help') {
           if (key) ctx.ui.notify('Usage: /ui help', 'info');
-          else await openCommandHelp(ctx, settings.enabled);
+          else await openCommandHelp(ctx, settings.enabled, settings);
           return;
         }
         if (action === 'changes') {
@@ -248,7 +252,7 @@ export default function (pi: ExtensionAPI) {
         return ['', theme.fg('accent', `TODO · ${clean(plan.title)} · ${done}/${plan.items.length}`),
           ...(shown.length ? shown.map(i => theme.fg(i.status === 'in_progress' ? 'accent' : i.status === 'completed' ? 'success' : 'dim',
             `  ${i.status === 'completed' ? '✓' : i.status === 'in_progress' ? '▸' : '□'}  ${clean(i.text)}`)) : [theme.fg('dim', '  No tasks yet · use /think to discuss and plan your task')]),
-          ...(plan.items.length > todoViewport.size ? [theme.fg('dim', `  ${start + 1}–${start + shown.length} of ${plan.items.length} · Ctrl+Alt+↑/↓ · ${todoViewport.following ? 'following' : '/todos follow'}`)] : []),
+          ...(plan.items.length > todoViewport.size ? [theme.fg('dim', `  ${start + 1}–${start + shown.length} of ${plan.items.length} · Alt+K ↑ / Alt+J ↓ · ${todoViewport.following ? 'following' : '/todos follow'}`)] : []),
           '',
         ].map(line => gutterLine(line, width, settings.padding));
       },
@@ -304,7 +308,7 @@ export default function (pi: ExtensionAPI) {
     todoViewport.scroll(delta, plan.items);
     refresh(ctx);
   };
-  for (const [key, delta] of [['ctrl+alt+up', -1], ['ctrl+alt+down', 1]] as const) {
+  for (const [key, delta] of [['alt+k', -1], ['alt+j', 1]] as const) {
     pi.registerShortcut(key, {
       description: `Scroll TODO panel ${delta < 0 ? 'up' : 'down'}`,
       handler: async ctx => {

@@ -32,7 +32,7 @@ Extensions execute with your user permissions. Review code before installation.
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-This downloads the tagged **v0.10.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
+This downloads the tagged **v0.11.0** archive into `~/.pi-workbench-ui` and registers the local directory with Pi. It requires Bash, curl, tar, Node.js 22.13+, GNU mv, and an installed `pi` command. On repeat runs it safely updates recognized older archive installs and backs up the previous copy; it refuses Git checkouts, symlinks, unrelated directories, and downgrades. Review remote scripts before running them; see [Installation and updates](docs/installation.md) for download-first instructions, options and archive updates.
 
 Alternatively, let Pi manage a Git package:
 
@@ -72,7 +72,7 @@ If the checkout has local changes or cannot fast-forward, resolve them before up
 | `/todos` | Toggle the TODO panel for this session |
 | `/todos all` | Show all tasks |
 | `/todos up` / `/todos down` | Scroll the four-item TODO viewport |
-| `/todos follow` | Resume automatically following the active item |
+| `/todos follow` | Resume following active/next pending work |
 | `/ui help` | Search Workbench UI commands and insert one as an editable draft |
 | `/ui changes` | Inspect staged, unstaged, and untracked Git changes in a read-only panel |
 | `/ui settings` | Show configuration and its file path |
@@ -83,7 +83,7 @@ If the checkout has local changes or cannot fast-forward, resolve them before up
 
 For multi-step work, ask Pi to maintain the task panel. The `todo_plan` tool replaces the full plan; at most one task can be active. Completed tasks remain until the next user prompt. Unfinished tasks survive follow-ups. Commands and internal extension follow-ups do not reset them.
 
-The panel shows at most four items. Longer plans show a range such as `2–5 of 9`. Scroll one item with **Ctrl+Alt+↑ / Ctrl+Alt+↓**, or use `/todos up` and `/todos down` if your terminal intercepts these shortcuts. Manual scrolling pauses auto-follow until `/todos follow`; ordinary arrow keys remain editor/history keys. Status updates preserve the browsed position, while a new plan title, session reload or branch navigation restores auto-follow. `/todos all` still shows the full list.
+The panel shows at most four items. It automatically follows the active task, or the next pending task when none is active, and advances as tasks finish. When all tasks are complete, the final four items stay visible until the normal next-prompt reset. Longer plans show a range such as `2–5 of 9`. Scroll one item with **Alt+K** (up) / **Alt+J** (down), or use `/todos up` and `/todos down` if your terminal intercepts these shortcuts. Manual scrolling pauses auto-follow until `/todos follow`; ordinary arrow keys remain editor/history keys. Status updates preserve the browsed position, while a new plan title, session reload or branch navigation restores auto-follow. `/todos all` still shows the full list.
 
 The empty-panel hint suggests `/think`, which is provided by Pi Workbench—not this package. Without Workbench, ask Pi directly to create a plan.
 
@@ -91,7 +91,7 @@ The `ui_title` tool gives the next call of a named tool an explicit task descrip
 
 ## Command palette
 
-Run `/ui help` for **UI**, **TODOs**, and **Task usage** commands with short descriptions and argument hints. Type to filter; use **↑/↓** or **PageUp/PageDown** to navigate. **Enter** inserts the selection into an empty editor without running it or copying the argument placeholders, and **Esc** closes the panel. Fill in any required arguments and press Enter in the editor when you’re ready. A draft already in the editor is never replaced. If custom UI is disabled or you use RPC, `/ui help` shows a plain-text list. `/ui settings` is unchanged.
+Run `/ui help` for **UI**, **TODOs**, and **Task usage** commands with short descriptions and argument hints. Type to filter; use **↑/↓** or **PageUp/PageDown** to navigate. **Enter** inserts the selection into an empty editor without running it or copying the argument placeholders, and **Esc** closes the panel. Fill in any required arguments and press Enter in the editor when you’re ready. A draft already in the editor is never replaced. If custom UI is disabled or you use RPC, `/ui help` shows a plain-text list. Long command descriptions wrap inside the panel instead of requiring horizontal scrolling; ↑/↓ and PageUp/PageDown navigate the wrapped list. The **Settings** group explains every `/ui set` key with its purpose, current/default values, accepted values and a valid example. Search for a key (such as `promptStyle`) or a value (such as `outline`), select an example, then edit and submit the inserted draft to apply it. Settings are local to each device, not synchronized by Git. `/ui reset` disables custom UI but keeps saved preferences; it is not a factory reset. `/ui settings` is unchanged.
 
 ## Working tree changes
 

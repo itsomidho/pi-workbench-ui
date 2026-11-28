@@ -8,14 +8,14 @@ Choose an archive installation (no Git), a dedicated Git checkout, or a Pi-manag
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh | bash
 ```
 
-The script defaults to the published `v0.10.0` archive and installs to `~/.pi-workbench-ui`. Prerequisites: Bash, curl, tar, Node.js 22.13+, GNU mv (Linux/coreutils), and Pi on PATH. It does not use Git, sudo, or npm. The installer checks the downloaded package name, version, manifest and required files; it does not provide an independent cryptographic signature check. Downloads rely on GitHub HTTPS.
+The script targets the tagged `v0.11.0` release archive and installs to `~/.pi-workbench-ui`. Prerequisites: Bash, curl, tar, Node.js 22.13+, GNU mv (Linux/coreutils), and Pi on PATH. It does not use Git, sudo, or npm. The installer checks the downloaded package name, version, manifest and required files; it does not provide an independent cryptographic signature check. Downloads rely on GitHub HTTPS.
 
 To review the script before execution:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/itsomidho/pi-workbench-ui/main/install.sh -o /tmp/pi-workbench-ui-install.sh
 less /tmp/pi-workbench-ui-install.sh
-bash /tmp/pi-workbench-ui-install.sh --version v0.10.0
+bash /tmp/pi-workbench-ui-install.sh --version v0.11.0
 ```
 
 Options:
@@ -63,4 +63,4 @@ pi install git:github.com/itsomidho/pi-workbench-ui
 pi update --extensions
 ```
 
-To pin a release, install `git:github.com/itsomidho/pi-workbench-ui@v0.10.0`; updating reconciles that fixed ref rather than moving it to a newer release. To unregister, run `pi remove git:github.com/itsomidho/pi-workbench-ui` or use the exact source shown by `pi list`. Run `/reload` after changes.
+To pin a release, install `git:github.com/itsomidho/pi-workbench-ui@v0.11.0`; updating reconciles that fixed ref rather than moving it to a newer release. To unregister, run `pi remove git:github.com/itsomidho/pi-workbench-ui` or use the exact source shown by `pi list`. Run `/reload` after changes.

@@ -1,5 +1,7 @@
 # Configuration
 
+Run `/ui help` for the searchable **Settings** reference: purpose, current/default values, allowed values and a ready-to-edit example for every key. Type a key or value to filter; ↑/↓ select, PageUp/PageDown scroll, Enter inserts an example as a draft, and Esc closes. Nothing executes until you submit the draft; existing editor text is never replaced. `/ui reset` disables custom UI and preserves saved preferences—it does not restore factory defaults. Settings are device-local, outside the repository, so Git does not synchronize them.
+
 Run `/ui settings` to inspect active settings and their file path. Settings changes save atomically and reload Pi. Invalid configuration disables custom UI while leaving `/ui reset` available to repair it.
 
 | Key | Default | Values |
@@ -33,4 +35,4 @@ Collapsed previews apply an additional line limit after native rendering. Expand
 
 The footer uses cumulative session statistics, including recorded compaction/summary/nested-tool usage. Routing metadata comes from the active branch's latest assistant message; missing metadata is displayed as unknown.
 
-TODO and explicit tool-title history live in the Pi session. Visibility toggled with `/todos` is session-local; use `/ui set todos false` for a persistent preference. The viewport shows four items, with Ctrl+Alt+Up/Down or `/todos up|down` for longer plans. Manual browsing pauses active-item follow until `/todos follow`. Scroll offsets are presentation-only: status updates retain them (clamped to list length), while new plan titles, empty plans, session reload/resume and tree navigation reset follow mode. No task status is changed by scrolling.
+TODO and explicit tool-title history live in the Pi session. Visibility toggled with `/todos` is session-local; use `/ui set todos false` for a persistent preference. The viewport shows four items, with Alt+K (up) / Alt+J (down) or `/todos up|down` for longer plans. Automatic follow prioritizes the active item, then the first pending item, and shows the final four completed items when nothing remains unfinished. Completing a task advances the viewport without requiring a new active status. Manual browsing pauses follow until `/todos follow`. Scroll offsets are presentation-only: status updates retain them (clamped to list length), while new plan titles, empty plans, session reload/resume and tree navigation reset follow mode. No task status is changed by scrolling.

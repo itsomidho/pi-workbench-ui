@@ -8,7 +8,7 @@ The reported duplicated assistant sentence occurs only on screen (saved content 
 
 Token usage tests cover provider fields, missing/zero values, cache separation, shared parallel calls, nested live calls, active-branch restoration, no per-render session scans, and responsive border labels. A real Pi PTY fixture resumes two sibling tool calls and checks shared usage plus separate tool-model usage without contacting a provider. Live-provider accounting has not been independently audited.
 
-TODO navigation regression tests cover four-row limits, 0–50 items, clamping, paused/follow mode, branch reset, hidden panels and narrow widths. A real Pi PTY test verifies Up/Down prompt history after `/reload`, Ctrl+Alt+arrows, `/todos follow`, draft typing and 40-column resize on a resumed session (no provider calls).
+TODO navigation regression tests cover four-row limits, every sequential completion transition for 0–50 items, active-over-pending priority, next-pending fallback, final completed page, clamping, manual pause/resume, unchanged task data, branch reset, hidden panels and narrow widths. The real Pi TODO fixture has completed and pending items without an active item to verify automatic next-pending follow on resume/reload. A real Pi PTY test verifies Up/Down prompt history after `/reload`, Alt+K/J scrolling (including while a draft is present), `/todos follow`, draft typing and 40-column resize on a resumed session (no provider calls).
 
 Native autocomplete PTY coverage types a slash-command prefix and a file reference, verifies the single-result menu row remains visible, and accepts each with Tab while `promptSuggestions` is enabled. This protects against replacing Pi’s last autocomplete row with an editor border.
 
@@ -26,7 +26,7 @@ Native autocomplete PTY coverage types a slash-command prefix and a file referen
 
 ## Command palette
 
-Palette regressions check grouped/searchable syntax, descriptions, required-argument prefixes, empty/missing results, narrow layouts and plain-text fallback. A real Pi PTY runs `/ui help`, filters commands, inserts `/ui reset` without changing settings, appends a required argument to a draft, and verifies Escape after a 40-column resize. A command-handler fixture verifies an existing draft is not overwritten.
+Palette regressions check grouped/searchable syntax, descriptions, required-argument prefixes, empty/missing results, narrow layouts and plain-text fallback. A real Pi PTY runs `/ui help`, filters commands, inserts `/ui reset` without changing settings, appends a required argument to a draft, and verifies Escape after a 40-column resize. A command-handler fixture verifies an existing draft is not overwritten. Wrapping regressions assert complete description tails without ellipses at 40/80/120 columns, visibility of each selection while resizing, and PageUp/PageDown reachability of the first/last entries. Settings coverage checks every key against the defaults, validates all examples and enumerated choices, tests integer boundaries and invalid values, and verifies active versus default values and layouts across narrow/short terminals. The real Pi palette scenario also searches `promptStyle` and `promptLabel`, checks current/default/allowed values, inserts an example draft, and confirms selection/cancellation never writes configuration.
 
 ## Working tree changes
 
